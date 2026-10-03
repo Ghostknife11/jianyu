@@ -59,6 +59,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@651bceb6f9ca583f16b8d75b62c36ded2ae6fc9c # v4.0.0
+        with:
+          packages: platform-tools
       - name: Install Android API 35
         run: sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0'
       - name: Test, build, and lint the native app

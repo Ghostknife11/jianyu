@@ -27,7 +27,7 @@ Windows:  .\gradlew.bat test :app:assembleDebug :app:assembleDebugAndroidTest :a
 Unix:     bash ./gradlew test :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:assembleRelease :app:lintRelease
 ```
 
-The debug APK is `apps/jianyu-android/app/build/outputs/apk/debug/app-debug.apk`. It is a debug-signed development artifact, **not** a family-ready release. The Release build is an unsigned R8/lint check, not a distributable APK. CI is configured to repeat source, unit, Debug/Release build, and lint checks on a clean Ubuntu runner and scan the checked-out tree and Git history with a SHA-256-pinned Gitleaks binary; its first remote run has not yet been verified. CI does not run an Android emulator, contact a real AI provider, review cryptography, or publish an APK.
+The debug APK is `apps/jianyu-android/app/build/outputs/apk/debug/app-debug.apk`. It is a debug-signed development artifact, **not** a family-ready release. The Release build is an unsigned R8/lint check, not a distributable APK. CI is configured to repeat source, unit, Debug/Release build, and lint checks on a clean Ubuntu runner and scan the checked-out tree and Git history with a SHA-256-pinned Gitleaks binary. Check the actual Actions result for the proposed public commit; a workflow file or a green local run is not a green remote run. CI does not run an Android emulator, contact a real AI provider, review cryptography, or publish an APK.
 
 调试 APK 不是面向家庭的发行包；Release 构建只检查 R8 与 lint，产物未签名，不可分发。CI 还会用固定校验值的扫描工具检查源码和 Git 历史，并在运行 Gradle 前校验启动文件；它不运行安卓模拟器、不调用真实 AI、不做独立密码学审查，也不发布 APK。
 
