@@ -1,0 +1,19 @@
+{
+  "name": "见隅 · 家庭机会引擎",
+  "short_name": "见隅",
+  "description": "从孩子当下的兴趣出发，为家庭多发现几扇门。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2eee4",
+  "theme_color": "#30483a",
+  "icons": [
+    {
+      "src": "/apps/jianyu-web-prototype/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

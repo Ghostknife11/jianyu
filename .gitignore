@@ -1,0 +1,41 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+.gradle/
+.kotlin/
+coverage/
+.cache/
+.tmp/
+.toolchains/
+artifacts/emulator/
+artifacts/ui-tests/
+local.properties
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.p8
+*.pfx
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+*.sqlite
+*.sqlite3
+
+# Local vaults, exports, and sync staging
+.jianyu/
+family-vault/
+exports/
+sync-staging/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

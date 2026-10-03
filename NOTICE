@@ -1,0 +1,16 @@
+Family Opportunity Engine and the Jianyu reference application
+Copyright 2026 Family Opportunity Engine contributors
+
+This product includes software developed by the Family Opportunity Engine contributors.
+
+The Android project's Gradle Wrapper scripts and JAR originate from Gradle and
+are distributed under the Apache License, Version 2.0. Their original script
+copyright and license headers are retained. See docs/DEPENDENCY-LICENSE-REVIEW.md
+for the source-publication dependency inventory and its limits.
+
+Licensed under the Apache License, Version 2.0. See LICENSE for the full text.
+
+The Apache License does not grant permission to use project names, logos, or other
+brand identifiers to imply endorsement or official status. See BRAND.md. This
+notice does not restrict truthful attribution, nominative reference, or the right
+to create and distribute a rebranded fork under the License.

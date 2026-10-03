@@ -1,0 +1,72 @@
+{
+  "schema": "org.foe.pack/v1",
+  "id": "org.jianyu.starter.motorsport",
+  "version": "1.0.0",
+  "title": "从兴趣到现实：赛车",
+  "publisher": "内置合成示例",
+  "license": "Apache-2.0",
+  "language": "zh-CN",
+  "sponsorship": null,
+  "opportunities": [
+    {
+      "schema": "org.foe.opportunity/v1",
+      "opportunityId": "measure-coast",
+      "title": "找一段安全斜面，比较不同小车滑行的差别",
+      "entryPoint": {
+        "motivation": "optimization",
+        "whyNow": "孩子正在主动注意车、速度或调校。",
+        "startupCost": "low"
+      },
+      "ecosystem": "making",
+      "goalAlignment": {"primary": "child", "secondary": []},
+      "childPull": true,
+      "requirements": {
+        "timeMinutes": 35,
+        "costBand": "free-existing",
+        "caregiverEnergy": "low",
+        "travelMinutes": 0
+      },
+      "source": {"kind": "pack", "publisher": "org.jianyu.starter.motorsport"},
+      "verification": "idea",
+      "risks": [],
+      "score": 0.62,
+      "explanation": "先保留预测、试错和争论，不急着把体验改写成物理课。",
+      "sponsorship": null,
+      "triggerTerms": ["赛车", "汽车", "轮胎", "卡丁车"],
+      "minAge": 4,
+      "maxAge": 15,
+      "naturalEntry": true,
+      "interventionPressure": "low"
+    },
+    {
+      "schema": "org.foe.opportunity/v1",
+      "opportunityId": "ask-a-practitioner",
+      "title": "下次本来就要保养时，请孩子问师傅一个真问题",
+      "entryPoint": {
+        "motivation": "real-machines",
+        "whyNow": "已有问题可以在自然生活场景里得到更真实的回应。",
+        "startupCost": "low"
+      },
+      "ecosystem": "people",
+      "goalAlignment": {"primary": "child", "secondary": []},
+      "childPull": true,
+      "requirements": {
+        "timeMinutes": 15,
+        "costBand": "free-existing",
+        "caregiverEnergy": "low",
+        "travelMinutes": 0
+      },
+      "source": {"kind": "pack", "publisher": "org.jianyu.starter.motorsport"},
+      "verification": "idea",
+      "risks": [],
+      "score": 0.6,
+      "explanation": "把兴趣接到真实职业与真实机器；不为教育目的额外制造行程。",
+      "sponsorship": null,
+      "triggerTerms": ["赛车", "汽车", "轮胎", "卡丁车"],
+      "minAge": 7,
+      "maxAge": 15,
+      "naturalEntry": true,
+      "interventionPressure": "low"
+    }
+  ]
+}

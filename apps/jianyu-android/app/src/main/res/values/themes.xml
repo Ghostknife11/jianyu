@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.Jianyu" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#356859</item>
+        <item name="android:colorBackground">#F8F6F0</item>
+        <item name="android:textColorPrimary">#1B1C19</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F8F6F0</item>
+        <item name="android:navigationBarColor">#F8F6F0</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

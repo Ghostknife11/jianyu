@@ -1,0 +1,7 @@
+# Tests
+
+Cross-package tests cover schema basics, Context Firewall minimization, World Brief public-query isolation, declarative Pack boundaries, Opportunity Gate, Diversity, Nothing, lifecycle authority, App event persistence, append-only correction behavior, fail-closed state merge, deletion-tombstone dominance, the public Web Crypto implementation of the opaque sync envelope, and the public JavaScript SyncProvider boundary. Android tests additionally cover strict AI-candidate parsing, prompt-data isolation, independent Provider failure, cancellation propagation, encrypted sync interoperability, subject-minimized Graduation export, and the ADR 0008 filesystem reference transport: canonical opaque IDs, traversal/semantic-ID rejection, immutable idempotent puts, deterministic cursor pagination, ciphertext round trips, and exact deletion.
+
+`node scripts/smoke-app.mjs` additionally drives a clean headless browser through encrypted setup, interest capture, multi-ecosystem results, Nothing, Gate explanations, family choice, timeline, lock/re-unlock, ciphertext inspection, and offline reload. It requires the local App server and Chrome (or `CHROME_PATH`).
+
+App-level automatic transport, Android folder authorization, WebDAV/S3 adapters, household key enrollment/rotation, device signatures, recovery drills, multi-step migrations, and full Provider/Policy/BrandConfig conformance remain release-gate work. Folder transport tests prove storage mechanics only; they do not prove safe multi-device synchronization.

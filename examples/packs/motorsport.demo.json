@@ -1,0 +1,90 @@
+{
+  "schema": "org.foe.pack/v1",
+  "id": "org.foe.demo.motorsport",
+  "version": "0.1.0",
+  "publisher": "FOE synthetic examples",
+  "license": "CC0-1.0",
+  "opportunities": [
+    {
+      "schema": "org.foe.opportunity/v1",
+      "opportunityId": "demo-game-tuning",
+      "title": "一起调一辆车，看看哪里真的更快",
+      "entryPoint": {
+        "motivation": "optimization",
+        "whyNow": "孩子最近主动比较赛车调校",
+        "startupCost": "low"
+      },
+      "ecosystem": "digital-game",
+      "goalAlignment": {"primary": "child", "secondary": ["shared"]},
+      "childPull": true,
+      "requirements": {
+        "timeMinutes": 60,
+        "costBand": "free-existing",
+        "caregiverEnergy": "low",
+        "travelMinutes": 0
+      },
+      "source": {"kind": "pack", "publisher": "org.foe.demo.motorsport"},
+      "verification": "idea",
+      "risks": [],
+      "score": 0.91,
+      "possibleConnections": ["speed-and-time", "friction"],
+      "explanation": "不用讲公式，让比较和试错先成立",
+      "sponsorship": null,
+      "triggerTerms": ["赛车", "赛车调校", "轮胎", "卡丁车"]
+    },
+    {
+      "schema": "org.foe.opportunity/v1",
+      "opportunityId": "demo-repair-tire",
+      "title": "下次保养或换轮胎时一起看看",
+      "entryPoint": {
+        "motivation": "real-machines",
+        "whyNow": "现实机械可能比观看内容更符合最近的主动行为",
+        "startupCost": "low"
+      },
+      "ecosystem": "family-life",
+      "goalAlignment": {"primary": "shared", "secondary": ["child"]},
+      "childPull": true,
+      "requirements": {
+        "timeMinutes": 45,
+        "costBand": "free-existing",
+        "caregiverEnergy": "low",
+        "travelMinutes": 20
+      },
+      "source": {"kind": "pack", "publisher": "org.foe.demo.motorsport"},
+      "verification": "idea",
+      "risks": [{"level": "low", "kind": "workshop-supervision"}],
+      "score": 0.88,
+      "possibleConnections": ["friction", "materials"],
+      "explanation": "只有家庭本来就要办这件事时才成立",
+      "sponsorship": null,
+      "triggerTerms": ["赛车", "汽车", "轮胎", "卡丁车"]
+    },
+    {
+      "schema": "org.foe.opportunity/v1",
+      "opportunityId": "demo-worksheet",
+      "title": "完成一套赛车物理练习题",
+      "entryPoint": {
+        "motivation": "curriculum-coverage",
+        "whyNow": "家长希望提前学习物理",
+        "startupCost": "medium"
+      },
+      "ecosystem": "worksheet",
+      "goalAlignment": {"primary": "caregiver", "secondary": []},
+      "childPull": false,
+      "requirements": {
+        "timeMinutes": 30,
+        "costBand": "free",
+        "caregiverEnergy": "medium",
+        "travelMinutes": 0
+      },
+      "source": {"kind": "pack", "publisher": "org.foe.demo.motorsport"},
+      "verification": "idea",
+      "risks": [],
+      "score": 0.99,
+      "possibleConnections": ["force"],
+      "explanation": "教育目标明确但缺少孩子入口",
+      "sponsorship": null,
+      "triggerTerms": ["赛车", "赛车物理", "轮胎", "卡丁车"]
+    }
+  ]
+}

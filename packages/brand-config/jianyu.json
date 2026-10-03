@@ -1,0 +1,23 @@
+{
+  "schema": "org.foe.brand-config/v1",
+  "id": "org.jianyu.default-brand",
+  "productName": "Jianyu",
+  "displayNameZhCN": "见隅",
+  "engineName": "Family Opportunity Engine",
+  "tagline": "More doors. Fewer prescriptions.",
+  "taglineZhCN": "多看见几扇门，少规定一条路。",
+  "heroZhCN": "从一隅，看见更多可能。",
+  "missionZhCN": "用 AI 缩小家庭获得教育机会的差距，而不是缩小孩子之间的差异。",
+  "privacyLine": "Your child is not our dataset.",
+  "features": {
+    "assessment": true,
+    "worldBrief": true,
+    "childMode": true,
+    "dailyStreak": false,
+    "missedOpportunityCount": false
+  },
+  "defaultPolicies": {
+    "age": "org.jianyu.age-default",
+    "opportunity": "org.jianyu.opportunity-default"
+  }
+}

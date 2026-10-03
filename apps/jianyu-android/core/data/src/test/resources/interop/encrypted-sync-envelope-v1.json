@@ -1,0 +1,36 @@
+{
+  "keyId": "fixture_sync_key_0001",
+  "testVector": "bytes-1-through-32",
+  "frame": {
+    "schema": "org.foe.sync-frame/v1",
+    "body": {
+      "schema": "org.foe.sync-frame-body/v1",
+      "frameId": "fixture-frame-1",
+      "household": {
+        "id": "fixture-household",
+        "name": "Synthetic Household",
+        "createdAt": "2026-09-14T00:00:00Z"
+      },
+      "deviceId": "fixture-device-1",
+      "sequence": 1,
+      "previousFrameHash": null,
+      "createdAt": "2026-09-14T01:00:00Z",
+      "members": [],
+      "children": [],
+      "evidence": [],
+      "hypotheses": [],
+      "choices": [],
+      "events": [],
+      "tombstones": [],
+      "retiredDeviceIds": []
+    },
+    "contentHash": "4c790f8f9dd119e47edf35bf7db3d30c174afd6fb182c3c17f7943a005b820bd"
+  },
+  "envelope": {
+    "format": "org.foe.encrypted-sync-envelope/v1",
+    "cipher": "AES-256-GCM",
+    "keyId": "fixture_sync_key_0001",
+    "nonce": "AAECAwQFBgcICQoL",
+    "ciphertext": "ChJy9KC4DGotEZAuFv_Z60byk-YH8RlRqzoc0Dn6RAqkhJCCKOGAAw0oLV7RX9AjAj7ajP24MpilTb7qsSYl85VF6Wc9fEDcrvH_Wi8ItaBArag1G_-DOUsBiTEd0-vl8bxWkhBygwOqibECOHSd6W91K9Ao4GbCu5KumSdiODPfWwGFfj20ThItpQeEsGa5jSyUlSjj2EUJXm7d-4X9QjBRmykpH8Lt3v3yPq2rwfTXMpc5cpsehIeVnj9xphazfFh4GqMRJKVUNSy2W9KodtZS4cs38PdIcdcpyLuVP4S8F0HaQbZiZ-j-TG-izVS7C0XuewpKq-20dlG3-Z2fPjcx5tv0bDd11suexYx1svNz0l2ds9ocrMUC2SQBzJx_GEysRtl5WQqlD1MqSV3EetOE2RRvucgwCWF6Qf7oQw5n46KBj6mRvXXBhiiL3XYIXFAStuyFHQvEm1owxT7ZSdM3UNusPHQmivGUtWZBHyoucInI8pfSOdJku2NG2RV79unZqXG0Hp8HnCbFesKTrK4S6H9DOFl1NkWnSPloFCqWfcKF0t6Pcasz0P4OGPLnZlVOM2V10akS2bD5_1lYZP6nJ73y7ZXPJ4j0U0Q1HuxPbbNo3VdNmzHB7K6T2-ystBv_fOuf5ZNAVfE9U-UmYcRVqVwjeqCfasC1kynwVJcjCJCLIg8hvzHm5MROX2L0HHMsrw"
+  }
+}

@@ -1,0 +1,14 @@
+# Dependency and asset review for source publication
+
+This is a source-repository inventory, not legal advice or a license certification for an APK. Recheck the exact resolved dependency graph, artifacts, notices, and obligations before distributing a signed binary. The authoritative dependency declarations are `apps/jianyu-android/gradle/libs.versions.toml` and the module `build.gradle.kts` files.
+
+| Material | Repository use | License evidence | Publication boundary |
+|---|---|---|---|
+| Gradle Wrapper scripts and JAR | The only third-party binary in the proposed source tree; downloads Gradle 8.11 | [Gradle source and wrapper license headers](https://github.com/gradle/gradle/blob/master/gradlew), [Gradle checksum reference](https://gradle.org/release-checks/) | Script headers remain intact. The checked-in JAR and distribution hashes are verified separately; no Gradle distribution ZIP is committed. |
+| AndroidX / Jetpack, including Compose, Activity, Core, Lifecycle, and AndroidX test libraries | Downloaded by Gradle, not vendored into this source repository | [AndroidX upstream](https://github.com/androidx/androidx) identifies its project license as Apache-2.0 | Direct families reviewed; a future APK needs an exact resolved-artifact and transitive-notice review. |
+| Kotlin standard library, serialization, and coroutines | Downloaded by Gradle, not vendored | [Kotlin](https://github.com/JetBrains/kotlin), [serialization](https://github.com/Kotlin/kotlinx.serialization), and [coroutines](https://github.com/Kotlin/kotlinx.coroutines) identify Apache-2.0 licensing | Compiler/build-tool dependencies are not redistributed with the source repository. Review the APK's resolved runtime set before binary distribution. |
+| JUnit 4 | JVM tests only | [JUnit 4 upstream](https://github.com/junit-team/junit4) identifies EPL-1.0 | Not an App runtime dependency or a vendored repository file. |
+
+The public JavaScript packages currently have no npm runtime dependencies (`package.json` is private and declares no dependencies). No downloaded font, photograph, raster image, sample family record, or model response from a live provider is proposed for the source tree. The web prototype's SVG icon and Android vector/launcher marks are project-created provisional assets; `BRAND.md` still requires a separate visual/trademark review before declaring an official identity.
+
+Before the first public commit, compare `git ls-files --others --exclude-standard` with this inventory and inspect every binary or media file. Before any signed APK, regenerate the resolved release dependency list on a clean machine, review transitive licenses and required notices, and place required attributions in the distributable. A source-only GitHub preview must not be presented as that completed binary review.

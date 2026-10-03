@@ -1,0 +1,28 @@
+{
+  "schema": "org.foe.model-compatibility/v1",
+  "generatedFrom": "synthetic-public-benchmark",
+  "warning": "Demonstration data only; no real model has been evaluated.",
+  "models": [
+    {
+      "provider": "demo",
+      "model": "synthetic-strong",
+      "status": "recommended",
+      "testedAt": "2026-09-12",
+      "capabilities": {
+        "structuredOutput": "good",
+        "constraintFollowing": "good",
+        "optionDiversity": "good",
+        "acceptsNothing": "good",
+        "avoidsChildLabels": "good",
+        "sourceDiscipline": "good"
+      }
+    },
+    {
+      "provider": "demo",
+      "model": "synthetic-unverified",
+      "status": "unverified",
+      "testedAt": null,
+      "capabilities": {}
+    }
+  ]
+}

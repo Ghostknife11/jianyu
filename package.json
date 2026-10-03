@@ -1,0 +1,22 @@
+{
+  "name": "family-opportunity-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Open Family Opportunity Engine and Jianyu reference app",
+  "license": "Apache-2.0",
+  "scripts": {
+    "web-prototype": "node apps/jianyu-web-prototype/dev-server.js",
+    "demo": "node apps/jianyu-web-prototype/src/demo.js",
+    "smoke": "node scripts/smoke-app.mjs",
+    "test": "node --test \"tests/*.test.js\"",
+    "check": "node scripts/check.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

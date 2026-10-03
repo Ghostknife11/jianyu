@@ -1,0 +1,108 @@
+{
+  "model": "synthetic-fixture-not-a-real-model",
+  "responses": {
+    "co-play-water": {
+      "opportunities": [
+        {
+          "title": "洗澡时让孩子自己比较几个杯子的装水量",
+          "explanation": "顺着原本就在玩的水，不安排额外练习。",
+          "whyNow": "孩子正在主动比较杯子。",
+          "ecosystem": "family-life",
+          "primaryGoal": "CHILD",
+          "childPull": true,
+          "timeMinutes": 10,
+          "costBand": "FREE_EXISTING",
+          "caregiverEnergy": "LOW",
+          "travelMinutes": 0,
+          "confidence": 0.65,
+          "minAge": 4,
+          "maxAge": 6,
+          "naturalEntry": true,
+          "interventionPressure": "LOW"
+        }
+      ]
+    },
+    "motorsport-multiple-doors": {
+      "opportunities": [
+        {
+          "title": "用已有的小车比较同一斜面的滑行差别",
+          "explanation": "只保留玩、预测和试错，不改成物理课。",
+          "whyNow": "孩子已经主动研究车怎样过弯。",
+          "ecosystem": "making",
+          "primaryGoal": "CHILD",
+          "childPull": true,
+          "timeMinutes": 30,
+          "costBand": "FREE_EXISTING",
+          "caregiverEnergy": "LOW",
+          "travelMinutes": 0,
+          "confidence": 0.63,
+          "minAge": 7,
+          "maxAge": 12,
+          "naturalEntry": true,
+          "interventionPressure": "LOW"
+        },
+        {
+          "title": "本来保养汽车时，由孩子决定是否问师傅一个真问题",
+          "explanation": "借已有生活安排接触真实工作，不额外制造行程。",
+          "whyNow": "家庭本周原本就要保养汽车。",
+          "ecosystem": "people",
+          "primaryGoal": "CHILD",
+          "childPull": true,
+          "timeMinutes": 15,
+          "costBand": "FREE_EXISTING",
+          "caregiverEnergy": "LOW",
+          "travelMinutes": 0,
+          "confidence": 0.59,
+          "minAge": 7,
+          "maxAge": 12,
+          "naturalEntry": true,
+          "interventionPressure": "LOW"
+        }
+      ]
+    },
+    "child-declines-this-week": {"opportunities": []},
+    "no-time-no-energy": {"opportunities": []},
+    "unverified-city-event": {
+      "opportunities": [
+        {
+          "title": "先让孩子挑一段真实机器人的公开视频",
+          "explanation": "不假设本周末有展览；若想出门，再单独核对实际活动信息。",
+          "whyNow": "孩子最近想亲眼看看机器人，但活动资料尚未核实。",
+          "ecosystem": "media",
+          "primaryGoal": "CHILD",
+          "childPull": true,
+          "timeMinutes": 20,
+          "costBand": "FREE_EXISTING",
+          "caregiverEnergy": "LOW",
+          "travelMinutes": 0,
+          "confidence": 0.54,
+          "minAge": 10,
+          "maxAge": 12,
+          "naturalEntry": true,
+          "interventionPressure": "LOW"
+        }
+      ]
+    },
+    "conflicting-observations": {
+      "opportunities": [
+        {
+          "title": "若孩子愿意，一起看看家里自行车的链条为什么会掉",
+          "explanation": "只回应今天的问题，不把上次拒绝课程解释成矛盾或缺陷。",
+          "whyNow": "孩子今天主动问了链条问题，家里正好有自行车。",
+          "ecosystem": "family-life",
+          "primaryGoal": "CHILD",
+          "childPull": true,
+          "timeMinutes": 30,
+          "costBand": "FREE_EXISTING",
+          "caregiverEnergy": "LOW",
+          "travelMinutes": 0,
+          "confidence": 0.61,
+          "minAge": 10,
+          "maxAge": 15,
+          "naturalEntry": true,
+          "interventionPressure": "LOW"
+        }
+      ]
+    }
+  }
+}
