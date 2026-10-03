@@ -2,7 +2,15 @@
 
 This file records what the current repository proves, what is only a boundary or fixture, and what must not yet be claimed. It is intentionally stricter than a roadmap.
 
-## Current checkpoint (2026-10-02)
+## Publication preflight (2026-10-04)
+
+The curated first local commit, `6da6a5b`, contains 281 source and documentation files and no local toolchain, build output, signing key, or family vault. A Gitleaks 8.30.1 scan of that actual one-commit history found no leaks. A fresh local clone of the commit passed 123 public JavaScript tests, all Android JVM tests, Debug and unsigned Release builds, both lint variants, the dedicated disposable-emulator suite of 49 instrumented tests, and the isolated browser-prototype smoke journey. Earlier, a separate source export completed the same Gradle checks with an initially empty Gradle cache. These checks prove reproducibility of this local developer-preview commit, not production safety, live recommendation quality, or the first remote GitHub Actions run. The previously shared temporary StepFun key was reported revoked by its owner; no test in this preflight used it.
+
+The GitHub repository was created privately, but the first push was rejected because the current OAuth credential lacked permission to update a workflow. Thus remote CI has not run. GitHub's private vulnerability reporting cannot be enabled until a repository is public; the chosen reporting route is not active while this repository remains private. See `SECURITY.md` and `DEVELOPMENT.md` for the visibility and reporting sequence. No signed, distributable APK or real-child-data acceptance is claimed.
+
+## Earlier implementation checkpoint (2026-10-02)
+
+The dated entries below are historical snapshots. Their candidate-file counts and statements about a missing commit describe the state at that earlier checkpoint, not the current repository.
 
 A dedicated disposable-AVD Android journey now combines the formal App path with an injected synthetic World Brief service: one approved public query is fetched with only the entered fictional region and public constraints, locally matched to the child's current interest, shown as a family option beside 留白, and accompanied by two pre-request approval plus two post-request scope records in the encrypted Vault. The 33-test Android UI suite passes. Its 360 dp / 1.3-font screenshot exposed a wording contradiction: a feed item explicitly marked `IDEA` was under an ecosystem pill saying `正在发生的世界`. That pill now says `世界线索`, leaving source and verification status separate; the new test asserts this wording. The updated result was visually inspected at that size in light and dark themes, and the disposable AVD was restored to light mode with no synthetic Vault left behind. This is App wiring and synthetic UI evidence, not live World Brief service verification or a real-world event claim.
 
