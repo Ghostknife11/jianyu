@@ -68,11 +68,14 @@ const store = createIndexedDbStore();
 const aiConnectionStore = createIndexedDbAiConnectionStore();
 const worldConnectionStore = createIndexedDbWorldConnectionStore();
 
+// The family-facing stage names are the ones docs/UI-SYSTEM.md fixes for every
+// surface: 共玩、陪伴、共选、放权、成年交接. The internal `co-play` / `hand-over`
+// keys stay as they are, because the schema and the shared Policy use them.
 const STAGE_LABELS = {
   "co-play": "4–6 共玩",
-  accompany: "7–9 陪同",
-  "co-select": "10–12 一起选",
-  "hand-over": "13–15 交给孩子",
+  accompany: "7–9 陪伴",
+  "co-select": "10–12 共选",
+  "hand-over": "13–15 放权",
   graduation: "16+ 成年交接"
 };
 
@@ -251,6 +254,10 @@ function button(label, onClick, tone = "filled") {
   return el("button", { class: tone === "text" ? "button--text" : "", type: "button", onClick }, label);
 }
 
+// Each disclosure names its own region, and the whole screen is rebuilt on every
+// render, so the ids have to be minted fresh rather than carried in state.
+let disclosureCount = 0;
+
 /**
  * The shared optional-details toggle. Every page uses the same `查看…` / `收起…`
  * wording and the same expanded state, so a disclosure never looks like a link
@@ -258,9 +265,19 @@ function button(label, onClick, tone = "filled") {
  * body can never disagree.
  */
 function disclosure(summary, expanded, onToggle, body) {
+  // The region stays in the DOM so `aria-controls` always names something that
+  // exists; it is hidden rather than removed when collapsed.
+  disclosureCount += 1;
+  const bodyId = `disclosure-body-${disclosureCount}`;
   return el("div", { class: "disclosure" }, [
-    button(expanded ? `收起${summary}` : `查看${summary}`, onToggle, "text"),
-    expanded ? el("div", { class: "disclosure-body" }, body) : null
+    el("button", {
+      class: "button--text",
+      type: "button",
+      "aria-expanded": expanded ? "true" : "false",
+      "aria-controls": bodyId,
+      onClick: onToggle
+    }, expanded ? `收起${summary}` : `查看${summary}`),
+    el("div", { class: "disclosure-body", id: bodyId, hidden: expanded ? null : true }, body)
   ]);
 }
 
@@ -308,7 +325,16 @@ function formatMoment(value) {
 
 function messageCard() {
   if (!state.message) return null;
+  // The same sentence is also written to the persistent live region outside
+  // #main, so a screen reader hears it even though the card itself is rebuilt
+  // from scratch on every render.
   return card("danger", [el("p", { class: "card-text", text: state.message })]);
+}
+
+/** Mirrors the current message into the live region that survives re-renders. */
+function announce() {
+  const region = document.getElementById("live-region");
+  if (region) region.textContent = state.message ?? "";
 }
 
 function conflictCard() {
@@ -849,7 +875,7 @@ function confirmCard() {
     ].filter(Boolean)),
     el("p", {
       class: "card-text card-text--quiet",
-      text: "不包含孩子和家庭的称呼、编号、出生日期，也不包含家庭历史。你自己写在句子里的名字或地址，本机检查无法识别，可能会一起发送。"
+      text: "不包含孩子和家庭的称呼、家庭及成员编号、出生日期，也不包含家庭足迹里的记录。你自己写在句子里的名字或地址，本机检查无法识别，可能会一起发送。"
     })
   ];
 
@@ -1166,9 +1192,9 @@ function stageExplanation(stage) {
 /** The five bands, once, so a family can see the whole arc at a glance. */
 const LIFECYCLE_OVERVIEW = [
   ["co-play", "4–6 共玩", "家长主导，孩子可以否决"],
-  ["accompany", "7–9 陪同", "家长和孩子一起选"],
-  ["co-select", "10–12 一起选", "家长和孩子一起选"],
-  ["hand-over", "13–15 交给孩子", "孩子主导"],
+  ["accompany", "7–9 陪伴", "家长和孩子一起选"],
+  ["co-select", "10–12 共选", "家长和孩子一起选"],
+  ["hand-over", "13–15 放权", "孩子主导"],
   ["graduation", "16+ 成年交接", "本人主导"]
 ];
 
@@ -1336,7 +1362,7 @@ function renderTimeline() {
     view.hiddenRestricted
       ? card("human-decision", [el("p", {
         class: "card-text",
-        text: "有些记录只对部分人可见，这里不显示它们的内容、数量，也不显示它们属于谁。"
+        text: "有些记录不在共享足迹显示。这里看不到它们的内容、数量，也看不到它们属于谁。"
       })])
       : null,
     view.entries.length === 0
@@ -1550,7 +1576,7 @@ function renderSettings() {
     return el("div", {}, [
       field("服务模板", aiTemplate),
       field("AI 服务地址", aiEndpoint),
-      field("AI 服务密钥", aiKey),
+      field("API 密钥", aiKey),
       field("模型名称", aiModel),
       field("调用方式", aiRoute),
       el("p", { class: "card-text card-text--quiet", text: describeAiRoute({
@@ -1965,11 +1991,10 @@ function render() {
   root.replaceChildren();
   if (state.screen === "app" && state.vault) {
     root.append(...renderApp());
-    return;
-  }
-  if (state.screen === "unlock") root.append(renderUnlock());
+  } else if (state.screen === "unlock") root.append(renderUnlock());
   else if (state.screen === "create") root.append(renderCreate());
   else root.append(renderBoot());
+  announce();
 }
 
 async function boot() {
@@ -1991,6 +2016,7 @@ async function boot() {
   const record = await store.read();
   state.screen = record ? "unlock" : "create";
   root.replaceChildren(record ? renderUnlock() : renderCreate());
+  announce();
 }
 
 boot();

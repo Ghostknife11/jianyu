@@ -4,6 +4,10 @@
  * 语义色调沿用 docs/UI-SYSTEM.md：中性承载资料与表单，绿色标记发现与当前阶段，
  * 暖色承载家庭决定与署名，冷灰表示开发预览，红色只用于删除与高风险动作。
  * 基线宽度 360dp，正文支持 1.3 字号与深浅两套主题。
+ *
+ * 尺寸一律用 rem，这样浏览器自身的字号设置会同样放大留白与触控目标，相当于
+ * UI-SYSTEM.md 里 1.3 字号那一项验收；只有 1px 的描边保持 px，因为它是细线，
+ * 放大成发丝线反而看不见。
  */
 
 :root {
@@ -32,12 +36,12 @@
   --danger-container: #f6d9d6;
   --on-danger-container: #521710;
 
-  --gutter: 20px;
-  --section-gap: 18px;
-  --card-gap: 16px;
-  --card-padding: 16px;
-  --card-radius: 18px;
-  --touch-target: 48px;
+  --gutter: 1.25rem;
+  --section-gap: 1.125rem;
+  --card-gap: 1rem;
+  --card-padding: 1rem;
+  --card-radius: 1.125rem;
+  --touch-target: 3rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -76,7 +80,7 @@ body {
   background: var(--surface);
   color: var(--on-surface);
   font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.5;
 }
 
@@ -89,8 +93,8 @@ body {
 .app-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px var(--gutter);
+  gap: 0.5rem;
+  padding: 0.625rem var(--gutter);
   border-bottom: 1px solid var(--outline);
   background: var(--surface-container);
 }
@@ -98,9 +102,9 @@ body {
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5625rem;
   background: var(--discovery-container);
   color: var(--on-discovery-container);
   font-weight: 600;
@@ -113,15 +117,15 @@ body {
 .brand-status {
   margin-left: auto;
   color: var(--on-surface-variant);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .page {
   flex: 1;
   width: 100%;
-  max-width: 640px;
+  max-width: 40rem;
   margin: 0 auto;
-  padding: var(--section-gap) var(--gutter) 32px;
+  padding: var(--section-gap) var(--gutter) 2rem;
   display: flex;
   flex-direction: column;
   gap: var(--section-gap);
@@ -129,13 +133,13 @@ body {
 
 .page-title {
   margin: 0;
-  font-size: 22px;
+  font-size: 1.375rem;
   line-height: 1.3;
   font-weight: 600;
 }
 
 .page-description {
-  margin: 8px 0 0;
+  margin: 0.5rem 0 0;
   color: var(--on-surface-variant);
 }
 
@@ -174,8 +178,8 @@ body {
 
 button {
   min-height: var(--touch-target);
-  padding: 0 18px;
-  border: none;
+  padding: 0 1.125rem;
+  border: 1px solid transparent;
   border-radius: 999px;
   font: inherit;
   font-weight: 600;
@@ -200,24 +204,23 @@ textarea,
 select {
   width: 100%;
   min-height: var(--touch-target);
-  padding: 10px 12px;
+  padding: 0.625rem 0.75rem;
   border: 1px solid var(--outline);
-  border-radius: 12px;
+  border-radius: 0.75rem;
   background: var(--surface);
   color: var(--on-surface);
   font: inherit;
 }
 
 :focus-visible {
-  outline: 3px solid var(--discovery);
-  outline-offset: 2px;
+  outline: 0.1875rem solid var(--discovery);
+  outline-offset: 0.125rem;
 }
 
 .visually-hidden {
   position: absolute;
   width: 1px;
-  height: 1px
-  ;
+  height: 1px;
   margin: -1px;
   padding: 0;
   overflow: hidden;
@@ -232,7 +235,7 @@ select {
 
 .card-title {
   margin: 0;
-  font-size: 17px;
+  font-size: 1.0625rem;
   line-height: 1.35;
   font-weight: 600;
 }
@@ -245,11 +248,11 @@ select {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .field-label {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--on-surface-variant);
 }
 
@@ -259,13 +262,13 @@ select {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .list-row {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0.125rem;
 }
 
 .list-title {
@@ -273,24 +276,24 @@ select {
 }
 
 .list-meta {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--on-surface-variant);
 }
 
 /* Nested explanation inside a card: same tones, no one-off tinted block. */
 .inset {
-  padding: 12px;
-  border-radius: 12px;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
   background: var(--surface-container-high);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .disclosure {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
   align-items: flex-start;
 }
 
@@ -306,14 +309,14 @@ select {
 .button-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.5rem;
   align-items: center;
 }
 
 .switcher-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.5rem;
   align-items: center;
   justify-content: space-between;
 }
@@ -321,19 +324,19 @@ select {
 .switcher-who {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0.125rem;
 }
 
 .picker {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .picker-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0.125rem;
   align-items: flex-start;
   background: var(--surface-container-high);
   color: var(--on-surface);
@@ -348,11 +351,11 @@ select {
 
 .pill {
   display: inline-block;
-  padding: 2px 10px;
+  padding: 0.125rem 0.625rem;
   border-radius: 999px;
   background: var(--surface-container-high);
   color: var(--on-surface-variant);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .pill--discovery {
@@ -385,18 +388,18 @@ select {
 }
 
 .door {
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 .door-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1.35;
   font-weight: 600;
 }
 
 .card-text--quiet {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--on-surface-variant);
 }
 
@@ -412,8 +415,8 @@ select {
   position: sticky;
   bottom: 0;
   display: flex;
-  gap: 4px;
-  padding: 6px var(--gutter) calc(6px + env(safe-area-inset-bottom));
+  gap: 0.25rem;
+  padding: 0.375rem var(--gutter) calc(0.375rem + env(safe-area-inset-bottom));
   border-top: 1px solid var(--outline);
   background: var(--surface-container);
 }
@@ -421,7 +424,7 @@ select {
 .nav-item {
   flex: 1;
   min-height: var(--touch-target);
-  border-radius: 12px;
+  border-radius: 0.75rem;
   background: none;
   color: var(--on-surface-variant);
   font-weight: 500;
@@ -431,4 +434,26 @@ select {
   background: var(--discovery-container);
   color: var(--on-discovery-container);
   font-weight: 600;
+}
+
+/* Windows 高对比度一类的强制颜色模式会抹掉背景色，只靠底色区分的按钮会变成一片
+   空白，所以这里把边框交还给系统颜色。 */
+@media (forced-colors: active) {
+  button,
+  .pill,
+  .nav-item,
+  .picker-item {
+    border: 1px solid ButtonBorder;
+  }
+
+  .card,
+  .inset,
+  .app-bar,
+  .nav {
+    border: 1px solid CanvasText;
+  }
+
+  :focus-visible {
+    outline: 0.1875rem solid CanvasText;
+  }
 }

@@ -23,6 +23,10 @@
     </section>
   </main>
 
+  <!-- Outside #main on purpose: a message that is thrown away together with its
+       own card is never announced, so the live region has to outlive re-renders. -->
+  <div id="live-region" class="visually-hidden" role="status" aria-live="polite"></div>
+
   <noscript>
     <section class="card card--danger">
       <h1 class="page-title">需要启用 JavaScript</h1>

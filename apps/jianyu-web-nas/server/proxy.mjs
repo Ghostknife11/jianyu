@@ -53,7 +53,7 @@ async function sendWithTimeout(url, init, timeoutMs) {
 export async function forwardAiCompletion({ endpoint, apiKey, payload }, config) {
   const url = assertProxyTarget(endpoint, { label: "AI 服务地址" });
   if (typeof apiKey !== "string" || apiKey.trim() === "" || apiKey.length > 512) {
-    throw new TypeError("AI 服务密钥格式不正确");
+    throw new TypeError("API 密钥格式不正确");
   }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new TypeError("AI 请求体格式不正确");

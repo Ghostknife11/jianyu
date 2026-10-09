@@ -75,8 +75,20 @@ class FakeNode {
   }
 
   text() {
-    return this.descendants().map((node) => node.textContent).join("\n");
+    // A `hidden` subtree is not on the screen, so a collapsed disclosure must
+    // not read as if its contents were visible.
+    return this.descendants()
+      .filter((node) => !isHidden(node))
+      .map((node) => node.textContent)
+      .join("\n");
   }
+}
+
+function isHidden(node) {
+  for (let scope = node; scope; scope = scope.parentNode) {
+    if (scope.attributes?.has("hidden")) return true;
+  }
+  return false;
 }
 
 function requestOutcome(request) {
@@ -205,6 +217,9 @@ const downloads = [];
 function installBrowserStubs() {
   elements.set("main", new FakeNode("main"));
   elements.set("brand-status", new FakeNode("span"));
+  // The live region sits outside #main so it outlives the re-renders; the stub
+  // registers it so the mirroring can be asserted.
+  elements.set("live-region", new FakeNode("div"));
   const body = new FakeNode("body");
   elements.set("body", body);
   globalThis.Node = FakeNode;
@@ -492,6 +507,64 @@ describe("NAS web bootstrap", () => {
     assert.match(text, /不包含孩子和家庭的称呼/u);
   });
 
+  it("keeps the disclosure readable without seeing the screen", async () => {
+    // The test before this one left the receipt open, so start from whichever
+    // label is actually on screen.
+    const open = main().descendants().find((node) => node.tagName === "BUTTON" && node.text() === "收起会发送的内容");
+    if (open) open.dispatch("click");
+
+    const toggle = buttonByLabel("查看会发送的内容");
+    assert.equal(toggle.getAttribute("aria-expanded"), "false", "the toggle starts closed");
+    const bodyId = toggle.getAttribute("aria-controls");
+    assert.ok(bodyId, "the toggle names the region it opens");
+    const region = main().descendants().find((node) => node.getAttribute("id") === bodyId);
+    assert.ok(region, "the named region exists even while collapsed");
+    assert.equal(region.text().includes("不包含孩子和家庭的称呼"), false, "collapsed content is not on the screen");
+
+    toggle.dispatch("click");
+    const opened = buttonByLabel("收起会发送的内容");
+    assert.equal(opened.getAttribute("aria-expanded"), "true", "the toggle says it is open");
+    // The render rebuilt the screen, so the region has to be looked up again.
+    const shown = main().descendants().find((node) => node.getAttribute("id") === opened.getAttribute("aria-controls"));
+    assert.match(shown.text(), /不包含孩子和家庭的称呼/u, "the same region now shows its contents");
+
+    opened.dispatch("click");
+    assert.equal(buttonByLabel("查看会发送的内容").getAttribute("aria-expanded"), "false");
+    assert.equal(region.text().includes("不包含孩子和家庭的称呼"), false);
+  });
+
+  it("names every control and repeats a message into the live region", async () => {
+    // Walk the whole rendered screen: a button with no text, or a text box with
+    // no label, is invisible to a screen reader even though it renders fine.
+    const unnamedButtons = main().descendants().filter((node) => node.tagName === "BUTTON" && node.text().trim() === "");
+    assert.deepEqual(unnamedButtons.map((node) => node.className), [], "every button carries its own label");
+
+    const orphanFields = main().descendants().filter((node) => {
+      if (!["INPUT", "TEXTAREA", "SELECT"].includes(node.tagName)) return false;
+      if (node.getAttribute("aria-label")) return false;
+      for (let scope = node.parentNode; scope; scope = scope.parentNode) {
+        if (scope.tagName === "LABEL") return false;
+      }
+      return true;
+    });
+    assert.deepEqual(orphanFields.map((node) => node.getAttribute("name")), [], "every field is labelled");
+
+    // A message that is rebuilt together with its own card is never announced,
+    // so the same sentence is mirrored into a region outside the main region.
+    const region = elements.get("live-region");
+    assert.equal(region.textContent, "", "nothing is announced before anything happens");
+    buttonByLabel("家庭").dispatch("click");
+    await settle("添加孩子");
+    inputByName("childName").value = "";
+    buttonByLabel("添加孩子").dispatch("click");
+    await settle("请填写孩子称呼");
+    const card = main().descendants().find((node) => /(^|\s)card--danger(\s|$)/.test(node.className));
+    assert.ok(card, "the refusal is shown on screen");
+    assert.equal(region.textContent, card.text(), "the same sentence reaches the live region");
+    buttonByLabel("今天").dispatch("click");
+    await settle("确认这次寻找");
+  });
+
   it("offers doors plus 留白 and records the family's choice", async () => {
     buttonByLabel("确认，开始这次寻找").dispatch("click");
     const result = await settle("选这个");
@@ -593,10 +666,10 @@ describe("NAS web bootstrap", () => {
     assert.match(text, /\d{4} 年 \d{1,2} 月 \d{1,2} 日/u, "each record says which day");
     assert.match(text, /孩子能自己决定什么/u);
     assert.match(text, /随着年龄变化，选择权慢慢交到孩子手上/u);
-    assert.match(text, /13–15 交给孩子/u, "the whole arc is visible, not just this child's band");
+    assert.match(text, /13–15 放权/u, "the whole arc is visible, not just this child's band");
     // Nothing in this family's records is restricted, so the screen says nothing
     // about hidden records rather than implying there are some.
-    assert.equal(text.includes("有些记录只对部分人可见"), false);
+    assert.equal(text.includes("不在共享足迹显示"), false);
   });
 
   it("adds a correction without rewriting the original", async () => {
@@ -641,11 +714,11 @@ describe("NAS web bootstrap", () => {
     const text = await settle("阶段按出生日期计算");
 
     assert.match(text, /小隅 · 13 岁/u);
-    assert.match(text, /13–15 交给孩子 · 孩子主导/u);
+    assert.match(text, /13–15 放权 · 孩子主导/u);
     assert.match(text, /二宝 · 10 岁/u);
-    assert.match(text, /10–12 一起选 · 家长和孩子一起选/u);
+    assert.match(text, /10–12 共选 · 家长和孩子一起选/u);
     assert.match(text, /三宝 · 7 岁/u);
-    assert.match(text, /7–9 陪同/u);
+    assert.match(text, /7–9 陪伴/u);
     // The stage is a date calculation, not a score, and the signature is not a login.
     assert.match(text, /阶段按出生日期计算，生日当天自动切换/u);
     assert.match(text, /不作为能力评分/u);

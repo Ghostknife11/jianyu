@@ -68,7 +68,7 @@ export function assertAiConnection(settings) {
     throw new AiConnectionError("AI 连接设置不完整");
   }
   const endpoint = assertText(settings.endpoint, { label: "AI 服务地址", minimum: 8, maximum: 2048 });
-  const apiKey = assertText(settings.apiKey, { label: "AI 服务密钥", minimum: 8, maximum: 512 });
+  const apiKey = assertText(settings.apiKey, { label: "API 密钥", minimum: 8, maximum: 512 });
   const model = assertText(settings.model, { label: "模型名称", minimum: 1, maximum: 80 });
   const route = settings.route === AI_ROUTES.direct ? AI_ROUTES.direct : AI_ROUTES.proxy;
   try {
