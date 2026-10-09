@@ -54,7 +54,7 @@ docker run --detach --name jianyu-nas --publish 8080:8080 --volume jianyu-data:/
 curl http://127.0.0.1:8080/healthz
 ```
 
-`docker compose --file apps/jianyu-web-nas/docker-compose.yml up --build --detach` does the same with a named volume. Changing the published port needs both the mapping and `JIANYU_PORT`, because the image's HEALTHCHECK reads that variable inside the container. Deployment, reverse-proxy TLS, and the honest limits are in [apps/jianyu-web-nas/README.md](apps/jianyu-web-nas/README.md). The CI `nas-web-reference` job builds the image, starts it on a scratch volume, waits for the health check, checks the served client and its security headers, and asserts the data volume holds nothing but the three ciphertext directories.
+`docker compose --file apps/jianyu-web-nas/docker-compose.yml up --build --detach` does the same with a named volume. Changing the published port needs both the mapping and `JIANYU_PORT`, because the image's HEALTHCHECK reads that variable inside the container. Deployment, reverse-proxy TLS, and the honest limits are in [apps/jianyu-web-nas/README.md](apps/jianyu-web-nas/README.md). The CI `nas-web-reference` job builds the image, writes through it on a fresh volume as the non-root account, starts the container on a scratch volume, waits for the health check, checks the served client and its security headers, and asserts the data volume holds nothing but the three ciphertext directories.
 
 `apps/jianyu-web-nas` 是无依赖的 Node 22 服务器加无构建浏览器客户端，测试走递归 glob。镜像构建上下文是仓库根目录；部署、反向代理 TLS 与诚实边界见该目录的 README。
 
