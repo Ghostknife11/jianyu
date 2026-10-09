@@ -1,0 +1,226 @@
+/*
+ * 见隅 NAS 网页版样式令牌。
+ *
+ * 语义色调沿用 docs/UI-SYSTEM.md：中性承载资料与表单，绿色标记发现与当前阶段，
+ * 暖色承载家庭决定与署名，冷灰表示开发预览，红色只用于删除与高风险动作。
+ * 基线宽度 360dp，正文支持 1.3 字号与深浅两套主题。
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --surface: #fbf9f4;
+  --surface-container: #f2efe7;
+  --surface-container-high: #eae6dc;
+  --on-surface: #1e1c18;
+  --on-surface-variant: #5b574e;
+  --outline: #cdc7ba;
+
+  --discovery: #2f6b46;
+  --discovery-container: #d5ead9;
+  --on-discovery-container: #123324;
+
+  --human-decision: #8a5a12;
+  --human-decision-container: #f6e4c4;
+  --on-human-decision-container: #4a2f06;
+
+  --preview: #4a5b6b;
+  --preview-container: #dde5ec;
+  --on-preview-container: #1f2c37;
+
+  --danger: #a03028;
+  --danger-container: #f6d9d6;
+  --on-danger-container: #521710;
+
+  --gutter: 20px;
+  --section-gap: 18px;
+  --card-gap: 16px;
+  --card-padding: 16px;
+  --card-radius: 18px;
+  --touch-target: 48px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #14130f;
+    --surface-container: #201e19;
+    --surface-container-high: #2b2924;
+    --on-surface: #eae5da;
+    --on-surface-variant: #b3ac9e;
+    --outline: #45423a;
+
+    --discovery: #9fd3ae;
+    --discovery-container: #27402f;
+    --on-discovery-container: #cdebd6;
+
+    --human-decision: #e8c48a;
+    --human-decision-container: #46351a;
+    --on-human-decision-container: #f6e4c4;
+
+    --preview: #b3c4d3;
+    --preview-container: #2c3945;
+    --on-preview-container: #dde5ec;
+
+    --danger: #f0b3ac;
+    --danger-container: #4d201c;
+    --on-danger-container: #f6d9d6;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px var(--gutter);
+  border-bottom: 1px solid var(--outline);
+  background: var(--surface-container);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--discovery-container);
+  color: var(--on-discovery-container);
+  font-weight: 600;
+}
+
+.brand-name {
+  font-weight: 600;
+}
+
+.brand-status {
+  margin-left: auto;
+  color: var(--on-surface-variant);
+  font-size: 13px;
+}
+
+.page {
+  flex: 1;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--section-gap) var(--gutter) 32px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+}
+
+.page-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.page-description {
+  margin: 8px 0 0;
+  color: var(--on-surface-variant);
+}
+
+.card {
+  padding: var(--card-padding);
+  border-radius: var(--card-radius);
+  background: var(--surface-container);
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.card--neutral {
+  background: var(--surface-container);
+}
+
+.card--discovery {
+  background: var(--discovery-container);
+  color: var(--on-discovery-container);
+}
+
+.card--human-decision {
+  background: var(--human-decision-container);
+  color: var(--on-human-decision-container);
+}
+
+.card--preview {
+  background: var(--preview-container);
+  color: var(--on-preview-container);
+}
+
+.card--danger {
+  background: var(--danger-container);
+  color: var(--on-danger-container);
+}
+
+button {
+  min-height: var(--touch-target);
+  padding: 0 18px;
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--on-discovery-container);
+  background: var(--discovery-container);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.button--text {
+  background: none;
+  color: var(--on-surface);
+  font-weight: 500;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: 10px 12px;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--on-surface);
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--discovery);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px
+  ;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

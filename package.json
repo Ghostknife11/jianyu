@@ -7,9 +7,10 @@
   "license": "Apache-2.0",
   "scripts": {
     "web-prototype": "node apps/jianyu-web-prototype/dev-server.js",
+    "nas-web": "node apps/jianyu-web-nas/server/server.mjs",
     "demo": "node apps/jianyu-web-prototype/src/demo.js",
     "smoke": "node scripts/smoke-app.mjs",
-    "test": "node --test \"tests/*.test.js\"",
+    "test": "node --test \"tests/**/*.test.js\"",
     "check": "node scripts/check.mjs"
   },
   "engines": {

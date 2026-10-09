@@ -34,6 +34,9 @@ family-vault/
 exports/
 sync-staging/
 
+# NAS web runtime data (opaque ciphertext, credentials, sessions)
+apps/jianyu-web-nas/.data/
+
 # IDE and OS files
 .idea/
 .vscode/

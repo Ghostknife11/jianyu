@@ -1,0 +1,26 @@
+# Docker ignore rules for the Jianyu NAS web image.
+#
+# This file lives at the repository root because that image's build context is
+# the repository root: the browser client imports the shared engine packages by
+# relative path, so the whole tree must be visible to the build while the image
+# itself only needs the server, the web client, and those packages.
+
+.git
+.github
+.zcode
+.mimosa
+.vscode
+node_modules
+**/node_modules
+**/.DS_Store
+**/Thumbs.db
+**/.data
+
+# Not needed at runtime inside the image.
+apps/jianyu-android
+apps/jianyu-web-prototype
+docs
+scripts
+tests
+**/*.md
+**/*.log
