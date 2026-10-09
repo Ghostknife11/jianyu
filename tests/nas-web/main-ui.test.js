@@ -286,6 +286,21 @@ function pickerItem(name) {
   return matches[0];
 }
 
+/** One record on the footprint, addressed by text only it contains. */
+function recordCard(text) {
+  const matches = main().descendants().filter((node) =>
+    /(^|\s)card(\s|$)/.test(node.className) && node.text().includes(text));
+  assert.equal(matches.length, 1, `expected exactly one card containing ${text}`);
+  return matches[0];
+}
+
+/** A control inside one record, so a repeated label elsewhere is not ambiguous. */
+function controlIn(scope, label) {
+  const matches = scope.descendants().filter((node) => node.tagName === "BUTTON" && node.text() === label);
+  assert.equal(matches.length, 1, `expected exactly one button labelled ${label} inside the record`);
+  return matches[0];
+}
+
 /** Waits until the main region stops changing, so async handlers can settle. */
 async function settle(expectedSubstring) {
   const deadline = Date.now() + 20_000;
@@ -544,6 +559,79 @@ describe("NAS web bootstrap", () => {
     pickerItem("小隅").dispatch("click");
     await settle("记下这句话");
     assert.equal(inputByName("expression").value, "小隅说想研究赛车", "the draft comes back with its own child");
+  });
+
+  // The shared footprint. What matters here is that a record says who wrote it
+  // and when, that a correction is added rather than rewriting the original, and
+  // that deleting a choice is a separate, explicit step that also removes what
+  // is linked to it.
+  it("shows the family's own records with their author and day", async () => {
+    buttonByLabel("回望").dispatch("click");
+    const text = await settle("家庭足迹");
+
+    assert.match(text, /家庭足迹按时间记下谁在什么时候说了什么/u);
+    assert.match(text, /孩子当下在意的内容/u, "the recorded sentence is on the footprint");
+    assert.match(text, /林晓记录/u, "each record names who wrote it");
+    assert.match(text, /\d{4} 年 \d{1,2} 月 \d{1,2} 日/u, "each record says which day");
+    assert.match(text, /孩子能自己决定什么/u);
+    assert.match(text, /随着年龄变化，选择权慢慢交到孩子手上/u);
+    assert.match(text, /13–15 交给孩子/u, "the whole arc is visible, not just this child's band");
+    // Nothing in this family's records is restricted, so the screen says nothing
+    // about hidden records rather than implying there are some.
+    assert.equal(text.includes("有些记录只对部分人可见"), false);
+  });
+
+  it("adds a correction without rewriting the original", async () => {
+    const card = recordCard("孩子最近主动说自己很喜欢赛车，想弄明白轮胎为什么能抓地");
+    controlIn(card, "孩子后来改过说法").dispatch("click");
+    await settle("原记录会保留");
+
+    const field = inputByName("correction");
+    field.value = "孩子后来说的是想弄明白轮胎花纹，不是想买赛车";
+    field.dispatch("input");
+    buttonByLabel("保存这条纠正").dispatch("click");
+    const text = await settle("后来的纠正");
+
+    assert.match(text, /后来的纠正/u);
+    assert.match(text, /孩子后来说的是想弄明白轮胎花纹，不是想买赛车/u);
+    // The original is still there, unchanged, next to the correction.
+    assert.match(text, /孩子最近主动说自己很喜欢赛车，想弄明白轮胎为什么能抓地/u);
+    assert.match(text, /纠正的是另一条记录，原记录没有改写/u);
+  });
+
+  it("deletes a saved choice only after the young person confirms", async () => {
+    // The first child is 13, so the deletion is theirs to confirm.
+    // Titles are set as textContent rather than child nodes, so compare that.
+    const titles = () => main().descendants()
+      .filter((node) => node.className === "door-title" && node.textContent === "什么都不做").length;
+
+    const card = recordCard("什么都不做");
+    controlIn(card, "删除这个选择").dispatch("click");
+    const confirming = await settle("这次删除需要由孩子本人确认");
+    assert.match(confirming, /这次删除需要由孩子本人确认/u);
+    assert.match(confirming, /按一下只是记下这次确认是孩子做出的，并不验证身份/u);
+    assert.equal(titles(), 1, "nothing is removed before the confirmation");
+
+    buttonByLabel("由小隅确认删除").dispatch("click");
+    const after = await settle("已经删除这次选择");
+    assert.match(after, /已经删除这次选择，和它连在一起的记录也一并删除了/u);
+    assert.equal(titles(), 0, "the choice and its title are gone from the footprint");
+  });
+
+  it("lists each child with the band their birth date puts them in", async () => {
+    buttonByLabel("家庭").dispatch("click");
+    const text = await settle("阶段按出生日期计算");
+
+    assert.match(text, /小隅 · 13 岁/u);
+    assert.match(text, /13–15 交给孩子 · 孩子主导/u);
+    assert.match(text, /二宝 · 10 岁/u);
+    assert.match(text, /10–12 一起选 · 家长和孩子一起选/u);
+    assert.match(text, /三宝 · 7 岁/u);
+    assert.match(text, /7–9 陪同/u);
+    // The stage is a date calculation, not a score, and the signature is not a login.
+    assert.match(text, /阶段按出生日期计算，生日当天自动切换/u);
+    assert.match(text, /不作为能力评分/u);
+    assert.match(text, /按一下不代表验证了身份/u);
   });
 
   it("navigates to settings and erases only after a second confirmation", async () => {

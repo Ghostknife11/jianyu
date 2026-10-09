@@ -29,6 +29,12 @@ import {
 } from "./world-connection.js";
 import { planDiscovery, runDiscovery, DiscoveryError } from "./discovery-service.js";
 import {
+  TimelineError,
+  deleteChoice,
+  projectSharedTimeline,
+  recordCorrection
+} from "./timeline-service.js";
+import {
   buildTodayRequest,
   laterViewLabel,
   offersLaterView,
@@ -127,6 +133,30 @@ const today = {
   caution: null
 };
 
+// The 回望 screen. Corrections and deletions each take one explicit step, and a
+// deletion needs its own confirmation because it is not undoable from the screen.
+const timeline = {
+  correctingEventId: null,
+  correctionText: "",
+  pendingDeleteId: null,
+  saving: false
+};
+
+const EVENT_LABELS = {
+  "interest.observed": "孩子当下在意的内容",
+  "evidence.corrected": "后来的纠正",
+  "family.child-added": "加入了这个孩子",
+  "family.member-added": "加入了一位记录者",
+  "opportunity.choice-deleted": "一次删除"
+};
+
+const CHOICE_STATUS_LABELS = {
+  chosen: "家庭选了这个",
+  nothing: "这次什么都不做",
+  "child-vetoed": "孩子不想要",
+  reflected: "已经留下看法"
+};
+
 
 function el(tag, attributes = {}, children = []) {
   const node = document.createElement(tag);
@@ -208,6 +238,16 @@ function describe(error) {
 /** A stable fingerprint of the unlocked state, used to invalidate a preview. */
 function digestOf(vault) {
   return digestState(vault.state);
+}
+
+/**
+ * A moment the way a family reads it. Kept deliberately coarse: the footprint
+ * says which day something happened, not a stopwatch reading.
+ */
+function formatMoment(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "时间不详";
+  return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日`;
 }
 
 function messageCard() {
@@ -995,6 +1035,27 @@ function renderFamily() {
     conflictCard(),
     messageCard(),
     card("neutral", [
+      el("h2", { class: "card-title", text: "孩子" }),
+      vault.state.children.length === 0
+        ? el("p", { class: "card-text", text: "还没有添加孩子。可以先添加，这次也可以什么都不做。" })
+        : el("ul", { class: "list" }, vault.state.children.map((child) => {
+          const stage = childLifecycle(child);
+          return el("li", { class: "list-row" }, [
+            el("span", { class: "list-title", text: `${child.displayName} · ${stage.age} 岁` }),
+            el("span", {
+              class: "list-meta",
+              text: stage.stage
+                ? `${STAGE_LABELS[stage.stage]} · ${stageExplanation(stage)}`
+                : "未满 4 岁，暂不提供发现，记录本身会一直保留"
+            })
+          ]);
+        })),
+      el("p", {
+        class: "card-text card-text--quiet",
+        text: "阶段按出生日期计算，生日当天自动切换，不需要手动升级，也不作为能力评分。"
+      })
+    ]),
+    card("neutral", [
       el("h2", { class: "card-title", text: "家庭成员" }),
       el("ul", { class: "list" }, members.map((member) => el("li", { class: "list-row" }, [
         el("span", { class: "list-title", text: member.displayName }),
@@ -1002,7 +1063,11 @@ function renderFamily() {
       ]))),
       el("h2", { class: "card-title", text: "新记录由谁署名" }),
       field("记录者", recorder),
-      button("保存记录者", changeRecorder, "text")
+      button("保存记录者", changeRecorder, "text"),
+      el("p", {
+        class: "card-text card-text--quiet",
+        text: "署名只说明这条记录是谁写的。在共享设备上按一下不代表验证了身份，所以每条记录都会带上记录者的名字。"
+      })
     ]),
     card("neutral", [
       el("h2", { class: "card-title", text: "添加孩子" }),
@@ -1015,6 +1080,217 @@ function renderFamily() {
       field("家长称呼", caregiverName),
       button("添加家长", addCaregiverSubmit)
     ])
+  ]);
+}
+
+/** The authority sentence for one lifecycle band, in the family's own words. */
+function stageExplanation(stage) {
+  const authority = stage.authority?.primary ?? "caregiver";
+  return STAGE_AUTHORITY[authority] ?? "家长主导，孩子可以否决";
+}
+
+/** The five bands, once, so a family can see the whole arc at a glance. */
+const LIFECYCLE_OVERVIEW = [
+  ["co-play", "4–6 共玩", "家长主导，孩子可以否决"],
+  ["accompany", "7–9 陪同", "家长和孩子一起选"],
+  ["co-select", "10–12 一起选", "家长和孩子一起选"],
+  ["hand-over", "13–15 交给孩子", "孩子主导"],
+  ["graduation", "16+ 成年交接", "本人主导"]
+];
+
+/**
+ * The shared family footprint. This screen consumes the projection and never the
+ * raw collections: a restricted record cannot reach it through a direct event, a
+ * dependent choice, or a count (ADR 0012).
+ */
+function renderTimeline() {
+  const vault = state.vault;
+  const view = projectSharedTimeline(vault.state);
+  const children = vault.state.children;
+
+  async function saveCorrection(eventId) {
+    const text = timeline.correctionText.trim();
+    if (text === "") {
+      state.message = "请先写一句孩子真正的意思";
+      render();
+      return;
+    }
+    timeline.saving = true;
+    state.message = null;
+    render();
+    try {
+      const target = view.entries.find((entry) => entry.id === eventId);
+      recordCorrection(vault.state, {
+        childId: target?.childId,
+        targetEventId: eventId,
+        correction: text,
+        authorId: currentRecorder()?.id
+      });
+      await vault.save();
+      timeline.correctingEventId = null;
+      timeline.correctionText = "";
+    } catch (error) {
+      state.message = error instanceof TimelineError || error instanceof Error ? error.message : "这条纠正没有记下来";
+    }
+    timeline.saving = false;
+    render();
+  }
+
+  async function removeChoice(choiceId, authorId) {
+    timeline.saving = true;
+    state.message = null;
+    render();
+    try {
+      deleteChoice(vault.state, { choiceId, authorId });
+      await vault.save();
+      timeline.pendingDeleteId = null;
+      state.message = "已经删除这次选择，和它连在一起的记录也一并删除了。";
+    } catch (error) {
+      timeline.pendingDeleteId = null;
+      state.message = error instanceof Error ? error.message : "这次删除没有完成";
+    }
+    timeline.saving = false;
+    render();
+  }
+
+  function correctionForm(entry) {
+    const text = el("textarea", { name: "correction", rows: 2, maxlength: 500, "aria-label": "孩子真正的意思" });
+    text.value = timeline.correctionText;
+    text.addEventListener("input", () => { timeline.correctionText = text.value; });
+    return el("div", {}, [
+      el("p", {
+        class: "card-text card-text--quiet",
+        text: "原记录会保留，并明确标注已被纠正。这里写的是孩子真正的意思，不是你希望的意思。"
+      }),
+      field("孩子真正的意思", text),
+      el("div", { class: "button-row" }, [
+        button(timeline.saving ? "正在保存…" : "保存这条纠正", () => saveCorrection(entry.id), "filled"),
+        button("取消", () => {
+          timeline.correctingEventId = null;
+          timeline.correctionText = "";
+          render();
+        }, "text")
+      ])
+    ]);
+  }
+
+  function eventCard(entry) {
+    const label = EVENT_LABELS[entry.eventType] ?? entry.eventType;
+    const detail = entry.eventType === "evidence.corrected"
+      ? entry.payload?.correction ?? ""
+      : entry.payload?.expression ?? "";
+    const correcting = timeline.correctingEventId === entry.id;
+    return el("li", { class: "card card--neutral" }, [
+      el("h3", { class: "door-title", text: label }),
+      el("p", { class: "card-text", text: detail }),
+      el("p", {
+        class: "card-text card-text--quiet",
+        text: `${entry.childName ?? "家庭"} · ${entry.authorName}记录 · ${formatMoment(entry.occurredAt)}`
+      }),
+      entry.eventType === "evidence.corrected"
+        ? el("p", { class: "card-text card-text--quiet", text: `纠正的是另一条记录，原记录没有改写` })
+        : null,
+      correcting
+        ? correctionForm(entry)
+        : el("div", { class: "button-row" }, [
+          button("孩子后来改过说法", () => {
+            timeline.correctingEventId = entry.id;
+            timeline.correctionText = "";
+            render();
+          }, "text")
+        ])
+    ].filter(Boolean));
+  }
+
+  function choiceCard(entry) {
+    const statusLabel = CHOICE_STATUS_LABELS[entry.status] ?? "家庭的一个选择";
+    const pending = timeline.pendingDeleteId === entry.id;
+    const child = vault.state.children.find((item) => item.id === entry.childId) ?? null;
+    const stage = child ? childLifecycle(child) : null;
+    // ADR 0026: at 13+ the young person confirms the deletion themselves and it
+    // is attributed to them, so the button has to say who is confirming.
+    const needsYoungPerson = stage !== null && stage.age >= 13;
+    return el("li", { class: "card card--neutral" }, [
+      el("h3", { class: "door-title", text: entry.title }),
+      el("p", { class: "card-text card-text--quiet", text: statusLabel }),
+      entry.laterView
+        ? el("p", { class: "card-text", text: `后来的看法：${entry.laterView}` })
+        : null,
+      el("p", {
+        class: "card-text card-text--quiet",
+        text: `${entry.childName ?? "家庭"} · ${entry.authorName}记录 · ${formatMoment(entry.occurredAt)}`
+      }),
+      pending
+        ? el("div", {}, [
+          el("p", {
+            class: "card-text",
+            text: "删除后，这次选择的标题和后来的看法会一起从这台设备和以后的同步里消失。已经发出去的请求和以前导出的文件不在这个范围里。"
+          }),
+          needsYoungPerson
+            ? el("p", {
+              class: "card-text",
+              text: `${entry.childName}已经 13 岁以上，这次删除需要由孩子本人确认。请让孩子自己按下面的按钮：按一下只是记下这次确认是孩子做出的，并不验证身份。`
+            })
+            : null,
+          el("div", { class: "button-row" }, [
+            button(timeline.saving ? "正在删除…" : needsYoungPerson ? `由${entry.childName}确认删除` : "确认删除",
+              () => removeChoice(entry.id, needsYoungPerson ? child.memberId : currentRecorder()?.id), "filled"),
+            button("取消", () => {
+              timeline.pendingDeleteId = null;
+              render();
+            }, "text")
+          ])
+        ])
+        : el("div", { class: "button-row" }, [
+          button("删除这个选择", () => {
+            timeline.pendingDeleteId = entry.id;
+            render();
+          }, "text")
+        ])
+    ].filter(Boolean));
+  }
+
+  return el("div", { class: "page" }, [
+    el("h1", { class: "page-title", text: "回望" }),
+    el("p", {
+      class: "page-description",
+      text: "家庭足迹按时间记下谁在什么时候说了什么。这里的每一条都可以被纠正，纠正会作为新记录加上去，原记录不会被改写。"
+    }),
+    conflictCard(),
+    messageCard(),
+    // The only thing this screen says about what it is not showing.
+    view.hiddenRestricted
+      ? card("human-decision", [el("p", {
+        class: "card-text",
+        text: "有些记录只对部分人可见，这里不显示它们的内容、数量，也不显示它们属于谁。"
+      })])
+      : null,
+    view.entries.length === 0
+      ? card("neutral", [el("p", {
+        class: "card-text",
+        text: "还没有可以显示的家庭足迹。今天的一句话、一个选择，或一次留白，都会记在这里。"
+      })])
+      : el("ul", { class: "door-list" }, view.entries.map((entry) =>
+        entry.kind === "choice" ? choiceCard(entry) : eventCard(entry))),
+    card("neutral", [
+      el("h2", { class: "card-title", text: "孩子能自己决定什么" }),
+      el("p", { class: "card-text card-text--quiet", text: "随着年龄变化，选择权慢慢交到孩子手上。这不是奖励，也不是能力评分。" }),
+      el("ul", { class: "list" }, LIFECYCLE_OVERVIEW.map(([stage, label, authority]) => el("li", { class: "list-row" }, [
+        el("span", { class: "list-title", text: label }),
+        el("span", { class: "list-meta", text: authority })
+      ]))),
+      children.length === 0
+        ? null
+        : el("p", {
+          class: "card-text card-text--quiet",
+          text: children.map((child) => {
+            const stage = childLifecycle(child);
+            return stage.stage
+              ? `${child.displayName}现在在「${STAGE_LABELS[stage.stage]}」：${stageExplanation(stage)}。`
+              : `${child.displayName}还未满 4 岁，先不做发现，记录本身会保留。`;
+          }).join(" ")
+        })
+    ].filter(Boolean))
   ]);
 }
 
@@ -1196,14 +1472,21 @@ function renderSettings() {
       el("ul", { class: "list" }, [
         el("li", { class: "list-row" }, [
           el("span", { class: "list-title", text: "AI 发现" }),
-          el("span", { class: "list-meta", text: "未连接 · 开发预览" })
+          el("span", { class: "list-meta", text: today.sources.ai ? "已连接这台浏览器" : "未连接" })
         ]),
         el("li", { class: "list-row" }, [
           el("span", { class: "list-title", text: "世界信息" }),
-          el("span", { class: "list-meta", text: "未连接 · 开发预览" })
+          el("span", { class: "list-meta", text: today.sources.world ? "已连接这台浏览器" : "未连接" })
+        ]),
+        el("li", { class: "list-row" }, [
+          el("span", { class: "list-title", text: "离线演示" }),
+          el("span", { class: "list-meta", text: "始终可用 · 不发送、不保存" })
         ])
       ]),
-      el("p", { class: "card-text", text: "BYOK 密钥与瞬时代理将在后续版本接入；接入后每次调用前都会单独确认。" })
+      el("p", {
+        class: "card-text",
+        text: "AI 与世界信息的连接设置放在这台浏览器里，用保险箱密钥单独加密，不会进入家庭记录，也不会发到服务器。每次调用前都会单独确认，并显示会发送的内容。"
+      })
     ]),
     card("neutral", [
       el("h2", { class: "card-title", text: "恢复包" }),
@@ -1257,6 +1540,7 @@ function renderSettings() {
 function renderApp() {
   const routes = [
     ["today", "今天"],
+    ["timeline", "回望"],
     ["family", "家庭"],
     ["settings", "设置"]
   ];
@@ -1269,11 +1553,22 @@ function renderApp() {
         state.route = route;
         state.message = null;
         state.pendingErase = false;
+        // A correction or a deletion in flight belongs to the screen it started
+        // on, so leaving that screen abandons it rather than applying it later.
+        timeline.correctingEventId = null;
+        timeline.correctionText = "";
+        timeline.pendingDeleteId = null;
         render();
       }
     }, label))
   );
-  const screen = state.route === "today" ? renderToday() : state.route === "family" ? renderFamily() : renderSettings();
+  const screen = state.route === "today"
+    ? renderToday()
+    : state.route === "timeline"
+      ? renderTimeline()
+      : state.route === "family"
+        ? renderFamily()
+        : renderSettings();
   return [nav, screen];
 }
 
