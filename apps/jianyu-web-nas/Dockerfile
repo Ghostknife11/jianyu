@@ -29,6 +29,13 @@ ENV JIANYU_DATA_DIR=/data \
     JIANYU_HOST=0.0.0.0 \
     JIANYU_PORT=8080
 
+# The data directory is created and handed to the unprivileged account before the
+# volume is declared. Docker seeds a fresh named volume from the image's own
+# directory, so a root-owned /data would leave the server unable to create the
+# subdirectories it needs. A bind mount keeps the host directory's ownership
+# instead and has to be writable by this account on the host.
+RUN mkdir -p /data && chown node:node /data
+
 VOLUME ["/data"]
 
 # node:22-alpine ships an unprivileged account; the server never needs root.

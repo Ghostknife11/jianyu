@@ -519,6 +519,12 @@ if (invokedDirectly) {
     console.log("家庭数据在浏览器内加密；服务器只保存密文。远程访问请经反向代理启用 HTTPS。");
   }).catch((error) => {
     console.error(`[jianyu-nas] 启动失败：${error?.message ?? error}`);
+    // The server never runs as root, so it cannot widen the permissions itself. A
+    // named volume inherits the image's /data ownership, which leaves a bind mount
+    // owned by another host account as the usual cause.
+    if (error?.code === "EACCES" || error?.code === "EPERM") {
+      console.error(`[jianyu-nas] 无法写入 ${instance.config.dataDir}。请把宿主机上对应的目录改成该容器账户可写，或者加 --user "$(id -u):$(id -g)" 用宿主机账户运行。`);
+    }
     process.exitCode = 1;
   });
 }

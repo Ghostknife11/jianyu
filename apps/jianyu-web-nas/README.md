@@ -87,6 +87,18 @@ docker run --detach --name jianyu-nas \
 
 共同点只有一条：**让容器跑起来，把 8080 端口映射出去，给 `/data` 一个持久卷。** 剩下的每家不一样。
 
+用命名卷（compose 里的 `jianyu-data:/data`，或 `docker volume create` 建的那个）最省事，卷的属主会跟着镜像走。如果你改用**绑定挂载**（把宿主机某个目录直接挂到 `/data`），那属主归宿主机那个目录说了算——容器里的账户是 uid/gid 1000 的 `node`，不是 root，所以宿主机目录得让它可写。两种做法都行：
+
+```bash
+# 把宿主机的目录交给容器账户
+sudo chown -R 1000:1000 /volume1/docker/jianyu-data
+
+# 或者让容器直接用你现在的宿主机账户跑
+docker run --user "$(id -u):$(id -g)" --volume "$PWD/jianyu-data:/data" jianyu-nas-web:local
+```
+
+写不进去的时候服务器会在启动日志里直接说清楚，并给出这两条命令。
+
 ### 群晖 DSM（Container Manager）
 
 1. 套件中心安装 **Container Manager**。
