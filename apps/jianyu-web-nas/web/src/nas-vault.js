@@ -19,8 +19,10 @@ import {
   KDF_ITERATIONS,
   KDF_NAME,
   newSalt,
+  openLocalSecret,
   openState,
   randomObjectId,
+  sealLocalSecret,
   sealState,
   STATE_CIPHER,
   STATE_FORMAT
@@ -426,6 +428,21 @@ export class NasFamilyVault {
 
   addCaregiver(entry) {
     return addCaregiver(this.#state, entry);
+  }
+
+  /**
+   * Seals a browser-local secret with the vault key. Used for the AI
+   * connection settings, which must never join the family state and therefore
+   * never reach a bundle, a merge, or the server.
+   */
+  async sealLocalRecord(value, format) {
+    if (!this.isUnlocked) throw new VaultError("家庭保险箱尚未解锁");
+    return sealLocalSecret(this.#keys.vaultKey, value, { format, householdId: this.#record.householdId });
+  }
+
+  async openLocalRecord(sealed, format) {
+    if (!this.isUnlocked) throw new VaultError("家庭保险箱尚未解锁");
+    return openLocalSecret(this.#keys.vaultKey, sealed, { format, householdId: this.#record.householdId });
   }
 
   /** Drops the session and every in-memory key. The local record stays. */

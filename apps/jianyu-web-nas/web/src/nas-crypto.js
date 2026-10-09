@@ -117,6 +117,15 @@ function stateAad(householdId, stateVersion) {
 }
 
 /**
+ * Associated data for a browser-local secret. It carries no version, because
+ * the record is rewritten in place rather than migrated, and it names its own
+ * format so a sealed secret can never be replayed as family state.
+ */
+function localSecretAad(format, householdId) {
+  return encoder.encode(`${format}|${STATE_CIPHER}|${householdId}`);
+}
+
+/**
  * The two keys a household needs. `verifier` travels to the server (which
  * keeps only its SHA-256 hash); `vaultKey` never leaves this browser.
  */
@@ -194,6 +203,44 @@ export async function openState(vaultKey, sealed, householdId, stateVersion) {
 
 export async function digestState(state) {
   return bytesToHex(await sha256(encoder.encode(JSON.stringify(state))));
+}
+
+/**
+ * Seals a browser-local secret, such as an AI provider key. The value stays on
+ * this device: it is never part of the family state, so it is never merged,
+ * bundled, or uploaded.
+ */
+export async function sealLocalSecret(vaultKey, value, { format, householdId }) {
+  if (typeof format !== "string" || format === "") throw new TypeError("本地加密记录需要格式名称");
+  if (typeof householdId !== "string" || householdId === "") throw new TypeError("本地加密记录需要家庭标识");
+  const nonce = randomBytes(NONCE_BYTES);
+  const plaintext = encoder.encode(JSON.stringify(value));
+  const ciphertext = new Uint8Array(await globalThis.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce, additionalData: localSecretAad(format, householdId), tagLength: 128 },
+    vaultKey,
+    plaintext
+  ));
+  return { format, cipher: STATE_CIPHER, nonce: bytesToBase64(nonce), ciphertext: bytesToBase64(ciphertext) };
+}
+
+export async function openLocalSecret(vaultKey, sealed, { format, householdId }) {
+  if (!sealed || typeof sealed !== "object" || Array.isArray(sealed)) throw new TypeError("本地加密记录缺失");
+  if (sealed.format !== format) throw new TypeError("本地加密记录格式不受支持");
+  if (sealed.cipher !== STATE_CIPHER) throw new TypeError("本地加密记录的加密方式不受支持");
+  if (typeof sealed.nonce !== "string" || typeof sealed.ciphertext !== "string") {
+    throw new TypeError("本地加密记录不完整");
+  }
+  let plaintext;
+  try {
+    plaintext = await globalThis.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: base64ToBytes(sealed.nonce), additionalData: localSecretAad(format, householdId), tagLength: 128 },
+      vaultKey,
+      base64ToBytes(sealed.ciphertext)
+    );
+  } catch {
+    throw new TypeError("本地加密记录无法打开，可能属于另一个家庭或已被篡改");
+  }
+  return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(plaintext));
 }
 
 export function assertPassphrase(passphrase) {

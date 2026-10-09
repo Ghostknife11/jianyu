@@ -32,6 +32,7 @@ const STATIC_ALIASES = {
 
 const STATIC_PREFIXES = [
   "/apps/jianyu-web-nas/web/",
+  "/apps/jianyu-web-nas/shared/",
   "/packages/foe-core/src/",
   "/packages/foe-opportunity/src/",
   "/packages/foe-schema/src/",
