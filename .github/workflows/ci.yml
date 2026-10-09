@@ -47,7 +47,7 @@ jobs:
 
   nas-web-reference:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,7 +58,25 @@ jobs:
       - name: Test the NAS web server and proxy rules
         run: node --test "tests/nas-web/*.test.js"
       - name: Build the self-hosted image
-        run: docker build --file apps/jianyu-web-nas/Dockerfile --tag jianyu-nas-web:ci .
+        run: |
+          # The pinned base digest is pulled on its own before the build. Docker Hub
+          # answers anonymous pulls with 429 and its token endpoint with the odd 5xx,
+          # and neither says anything about this image, so a registry hiccup should
+          # not read as a broken build. Pulling first also means a genuine Dockerfile
+          # defect still fails on the first attempt, with nothing left to download.
+          base="$(awk '/^FROM /{print $2}' apps/jianyu-web-nas/Dockerfile)"
+          attempt=1
+          until docker pull "$base"; do
+            if [ "$attempt" -ge 6 ]; then
+              echo "could not pull $base after $attempt attempts" >&2
+              exit 1
+            fi
+            delay=$((attempt * 15))
+            echo "pull attempt $attempt failed; retrying in ${delay}s" >&2
+            sleep "$delay"
+            attempt=$((attempt + 1))
+          done
+          docker build --file apps/jianyu-web-nas/Dockerfile --tag jianyu-nas-web:ci .
       - name: Start the container on a scratch volume
         run: |
           docker volume create jianyu-nas-data
