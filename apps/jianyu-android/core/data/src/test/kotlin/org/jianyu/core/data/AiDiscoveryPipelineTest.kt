@@ -28,12 +28,15 @@ import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
+// 合成占位值：只用于断言请求头形状，不对应任何真实服务凭据；仓库中不得放入真实密钥。
+private const val SYNTHETIC_AUTHORIZATION_VALUE = "synthetic-authorization-value"
+
 class AiDiscoveryPipelineTest {
     private val settings = AiProviderSettings(
         providerName = "合成 AI",
         baseUrl = "https://example.test/v1",
         model = "synthetic-model",
-        apiKey = "synthetic-secret",
+        apiKey = SYNTHETIC_AUTHORIZATION_VALUE,
     )
 
     @Test
@@ -61,7 +64,7 @@ class AiDiscoveryPipelineTest {
 
         assertEquals("https://example.test/v1/chat/completions", connection.url.toString())
         assertEquals("POST", connection.requestMethod)
-        assertEquals("Bearer synthetic-secret", connection.getRequestProperty("Authorization"))
+        assertEquals("Bearer $SYNTHETIC_AUTHORIZATION_VALUE", connection.getRequestProperty("Authorization"))
         assertTrue(connection.disconnected)
         val body = Json.parseToJsonElement(connection.sent.toString(Charsets.UTF_8.name())) as JsonObject
         val messages = body.getValue("messages") as JsonArray
@@ -91,7 +94,7 @@ class AiDiscoveryPipelineTest {
                 assertEquals(0.65, temperature, 0.0)
                 assertTrue(system.contains("AI 只负责理解和发散"))
                 assertTrue(prompt.contains("\"currentInterest\":\"赛车拐弯\""))
-                assertFalse(prompt.contains("synthetic-secret"))
+                assertFalse(prompt.contains(SYNTHETIC_AUTHORIZATION_VALUE))
                 assertFalse(prompt.contains("recentSelectedOptionCount7Days"))
                 RESPONSE
             },

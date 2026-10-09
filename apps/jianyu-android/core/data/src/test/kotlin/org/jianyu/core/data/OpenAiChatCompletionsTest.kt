@@ -18,12 +18,16 @@ import java.net.SocketTimeoutException
 import java.net.URL
 
 /** Exercises the production HTTP envelope without a live provider, real key, or family data. */
+
+// 合成占位值：只用于断言请求头形状，不对应任何真实服务凭据；仓库中不得放入真实密钥。
+private const val SYNTHETIC_AUTHORIZATION_VALUE = "synthetic-authorization-value"
+
 class OpenAiChatCompletionsTest {
     private val settings = AiProviderSettings(
         providerName = "合成 AI",
         baseUrl = "https://example.invalid/v1",
         model = "synthetic-model",
-        apiKey = "synthetic-secret",
+        apiKey = SYNTHETIC_AUTHORIZATION_VALUE,
     )
 
     @Test
@@ -51,7 +55,7 @@ class OpenAiChatCompletionsTest {
         assertFalse(connection.instanceFollowRedirects)
         assertEquals(20_000, connection.connectTimeout)
         assertEquals(120_000, connection.readTimeout)
-        assertEquals("Bearer synthetic-secret", connection.getRequestProperty("Authorization"))
+        assertEquals("Bearer $SYNTHETIC_AUTHORIZATION_VALUE", connection.getRequestProperty("Authorization"))
         assertEquals("application/json; charset=utf-8", connection.getRequestProperty("Content-Type"))
         assertTrue(connection.disconnected)
 
@@ -64,7 +68,7 @@ class OpenAiChatCompletionsTest {
         assertEquals("合成系统规则", ((messages[0] as JsonObject).getValue("content") as JsonPrimitive).content)
         assertEquals("user", ((messages[1] as JsonObject).getValue("role") as JsonPrimitive).content)
         assertEquals(userPrompt, ((messages[1] as JsonObject).getValue("content") as JsonPrimitive).content)
-        assertFalse(connection.sent.toString(Charsets.UTF_8.name()).contains("synthetic-secret"))
+        assertFalse(connection.sent.toString(Charsets.UTF_8.name()).contains(SYNTHETIC_AUTHORIZATION_VALUE))
     }
 
     @Test
