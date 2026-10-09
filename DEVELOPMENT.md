@@ -31,6 +31,33 @@ The debug APK is `apps/jianyu-android/app/build/outputs/apk/debug/app-debug.apk`
 
 调试 APK 不是面向家庭的发行包；Release 构建只检查 R8 与 lint，产物未签名，不可分发。CI 还会用固定校验值的扫描工具检查源码和 Git 历史，并在运行 Gradle 前校验启动文件；它不运行安卓模拟器、不调用真实 AI、不做独立密码学审查，也不发布 APK。
 
+## Self-hosted NAS web app / NAS 网页版
+
+`apps/jianyu-web-nas` is a separate, dependency-free Node 22 server plus an unbuilt ESM browser client. The recursive glob is the one that includes its tests; the flat `tests/*.test.js` glob used above for the public contracts does not reach `tests/nas-web/`:
+
+```text
+node --test "tests/**/*.test.js"
+node --test "tests/nas-web/*.test.js"
+```
+
+Run the server without Docker for a quick change. The static root must be the repository root, because the client imports `packages/*` by relative path:
+
+```text
+JIANYU_STATIC_ROOT=. node apps/jianyu-web-nas/server/server.mjs
+```
+
+Build and run the image. The build context is the repository root, not the app directory:
+
+```text
+docker build --file apps/jianyu-web-nas/Dockerfile --tag jianyu-nas-web:local .
+docker run --detach --name jianyu-nas --publish 8080:8080 --volume jianyu-data:/data jianyu-nas-web:local
+curl http://127.0.0.1:8080/healthz
+```
+
+`docker compose --file apps/jianyu-web-nas/docker-compose.yml up --build --detach` does the same with a named volume. Changing the published port needs both the mapping and `JIANYU_PORT`, because the image's HEALTHCHECK reads that variable inside the container. Deployment, reverse-proxy TLS, and the honest limits are in [apps/jianyu-web-nas/README.md](apps/jianyu-web-nas/README.md). The CI `nas-web-reference` job builds the image, starts it on a scratch volume, waits for the health check, checks the served client and its security headers, and asserts the data volume holds nothing but the three ciphertext directories.
+
+`apps/jianyu-web-nas` 是无依赖的 Node 22 服务器加无构建浏览器客户端，测试走递归 glob。镜像构建上下文是仓库根目录；部署、反向代理 TLS 与诚实边界见该目录的 README。
+
 ## Android UI tests / 安卓界面测试
 
 On Windows, `scripts/run-android-ui-tests.ps1` runs instrumented tests only on the dedicated disposable `Jianyu_UiTests_API_35` AVD. It may install or remove the test App and its synthetic Vault. **Never target a daily-use emulator or a device containing family data.** The script checks the AVD identity before proceeding. Keep these UI results separate from CI's JVM/build results.
