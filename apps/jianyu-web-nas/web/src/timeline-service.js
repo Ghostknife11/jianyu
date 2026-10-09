@@ -18,6 +18,9 @@
 //   event that refers to its `choiceId`, then writes one `CHOICE` tombstone and
 //   one `EVENT` tombstone per removed event so an old copy cannot restore the
 //   content. The audit event carries opaque IDs only.
+//
+//   ADR 0010 — a 16+ retention outcome is a `SUBJECT` or `SUBJECT_CONTENT`
+//   tombstone, and it suppresses this person's records on every projection too.
 
 import { appendEvent, childLifecycle, createFamilyEvent } from "./family-state.js";
 import { AuthorizationError } from "./authorization.js";
@@ -73,14 +76,31 @@ export function projectSharedTimeline(state) {
       .filter((item) => String(item.targetType).toUpperCase() === "EVENT")
       .map((item) => item.targetId)
   );
+  // ADR 0010: a 16+ retention outcome is a subject-level tombstone. It is applied
+  // here as well as in the merge, so this screen can never resurrect the history
+  // a person asked the household to drop. A subject-content tombstone that is not
+  // subject-bound is invalid, and fails closed by still suppressing the target.
+  const subjectTombstones = (state.tombstones ?? []).filter((item) => {
+    const type = String(item.targetType).toUpperCase();
+    return type === "SUBJECT" || type === "SUBJECT_CONTENT";
+  });
+  const deletedSubjects = new Set(
+    subjectTombstones.filter((item) => String(item.targetType).toUpperCase() === "SUBJECT")
+      .map((item) => item.targetId)
+  );
+  const clearedSubjects = new Set(subjectTombstones.map((item) => item.targetId));
+  const subjectScoped = (subjectId) =>
+    typeof subjectId === "string" && (deletedSubjects.has(subjectId) || clearedSubjects.has(subjectId));
 
-  const events = state.events.filter((event) => !tombstonedEvents.has(event.eventId));
+  const events = state.events.filter((event) =>
+    !tombstonedEvents.has(event.eventId) && !subjectScoped(event.subjectId));
   const restrictedEvents = events.filter((event) => !isSharedVisible(event));
   const entries = [];
   let hidden = restrictedEvents.length > 0;
 
   for (const choice of state.choices) {
     if (tombstonedChoices.has(choice.id)) continue;
+    if (subjectScoped(choice.childId)) continue;
     const source = choice.sourceEventId
       ? events.find((event) => event.eventId === choice.sourceEventId) ?? null
       : null;

@@ -14,18 +14,23 @@ import {
   serializeRecoveryBundle
 } from "./recovery-bundle.js";
 import {
+  AI_CONNECTION_TEMPLATES,
   AI_ROUTES,
+  AiConnectionError,
   clearAiConnection,
   createIndexedDbAiConnectionStore,
   describeAiRoute,
-  readAiConnection
+  readAiConnection,
+  saveAiConnection
 } from "./ai-connection.js";
 import { createLlmProvider, AiProviderError } from "./ai-provider.js";
 import { createWorldBriefProvider, WorldBriefError } from "./world-brief-client.js";
 import {
+  WorldConnectionError,
   clearWorldConnection,
   createIndexedDbWorldConnectionStore,
-  readWorldConnection
+  readWorldConnection,
+  saveWorldConnection
 } from "./world-connection.js";
 import { planDiscovery, runDiscovery, DiscoveryError } from "./discovery-service.js";
 import {
@@ -34,6 +39,17 @@ import {
   projectSharedTimeline,
   recordCorrection
 } from "./timeline-service.js";
+import {
+  RETENTION_CONFIRMATION_PHRASE,
+  RETENTION_OUTCOMES,
+  GraduationError,
+  applyRetentionOutcome,
+  buildGraduationArchive,
+  createRetentionConsent,
+  graduationNotice,
+  sealGraduationBundle,
+  subjectAfterOutcome
+} from "./graduation-service.js";
 import {
   buildTodayRequest,
   laterViewLabel,
@@ -104,6 +120,28 @@ const state = {
   // The recovery bundle in flight: shown once at export, previewed then
   // confirmed on import. It is deliberately not a merge.
   recovery: null
+};
+
+// The two browser-local service settings and the 16+ hand-over. Their drafts live
+// outside the DOM, so a re-render never erases what a family typed half-way
+// through, and a key is never re-read into a field it was never stored in.
+const settings = {
+  ai: {
+    template: AI_CONNECTION_TEMPLATES[0].id,
+    endpoint: "",
+    apiKey: "",
+    model: "",
+    route: AI_ROUTES.proxy,
+    saved: null
+  },
+  world: { feedUrl: "", region: "", route: "proxy", saved: null },
+  graduation: {
+    childId: null,
+    outcome: RETENTION_OUTCOMES.readOnly,
+    phrase: "",
+    exported: null,
+    applying: false
+  }
 };
 
 // The Today flow. `drafts` keeps one unsent sentence per child so switching the
@@ -189,6 +227,24 @@ function field(label, control) {
 
 function input(attributes) {
   return el("input", attributes);
+}
+
+/**
+ * An input whose value lives in a module-level draft. A re-render rebuilds the
+ * whole screen, so anything typed into a DOM node is lost unless it is copied
+ * back out on every keystroke.
+ */
+function boundInput(attributes, draft, key) {
+  const node = el("input", attributes);
+  node.value = draft[key] ?? "";
+  node.addEventListener("input", () => { draft[key] = node.value; });
+  return node;
+}
+
+/** A select whose options are `[value, label]` pairs, with the current one set. */
+function select(name, options, current) {
+  return el("select", { name }, options.map(([value, label]) =>
+    el("option", { value, selected: value === current }, label)));
 }
 
 function button(label, onClick, tone = "filled") {
@@ -385,6 +441,19 @@ async function refreshSources() {
     readWorldConnection({ vault, store: worldConnectionStore }).catch(() => null)
   ]);
   today.sources = { ai: ai !== null, world: world !== null };
+  settings.ai.saved = ai;
+  settings.world.saved = world;
+}
+
+/** Saves a file without a server round trip: the bytes never leave the browser. */
+function downloadFile(name, text, mimeType) {
+  const blob = new Blob([text], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = el("a", { href: url, download: name });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function currentChild() {
@@ -733,6 +802,11 @@ function composerCard() {
     button(today.saving ? "正在保存…" : "记下这句话，看看有几扇门", submitInterest, "filled"),
     stage && !stage.lifecycle.discoveryOffered
       ? el("p", { class: "card-text", text: "未满 4 岁的孩子暂不提供发现，记录本身会一直保留。" })
+      : null,
+    // ADR 0007: at 16+ the household stops adding records about this person, so
+    // the composer says so rather than quietly accepting more of them.
+    child && graduationNotice(child)
+      ? el("p", { class: "card-text card-text--quiet", text: graduationNotice(child) })
       : null
   ]);
 }
@@ -1300,6 +1374,25 @@ function renderSettings() {
   const bundleCode = input({ name: "bundleCode", autocomplete: "off", placeholder: "例如 23456-23456-23456-23456" });
   const bundlePassphrase = input({ name: "bundlePassphrase", type: "password", autocomplete: "new-password" });
 
+  const aiTemplate = select("aiTemplate", AI_CONNECTION_TEMPLATES.map((template) =>
+    [template.id, template.label]), settings.ai.template);
+  const aiEndpoint = boundInput({ name: "aiEndpoint", autocomplete: "off", placeholder: "https://…" }, settings.ai, "endpoint");
+  const aiKey = boundInput({
+    name: "aiKey", type: "password", autocomplete: "off", placeholder: "只在这台浏览器里加密保存"
+  }, settings.ai, "apiKey");
+  const aiModel = boundInput({ name: "aiModel", autocomplete: "off", placeholder: "例如 gpt-4o-mini" }, settings.ai, "model");
+  const aiRoute = select("aiRoute", [
+    [AI_ROUTES.proxy, "经 NAS 瞬时代理（推荐）"],
+    [AI_ROUTES.direct, "浏览器直连（家庭内网自建服务）"]
+  ], settings.ai.route);
+
+  const worldUrl = boundInput({ name: "worldUrl", autocomplete: "off", placeholder: "https://…" }, settings.world, "feedUrl");
+  const worldRegion = boundInput({ name: "worldRegion", autocomplete: "off", placeholder: "例如 华东" }, settings.world, "region");
+  const worldRoute = select("worldRoute", [
+    ["proxy", "经 NAS 代理拉取（推荐）"],
+    ["direct", "浏览器直连（家庭内网自建 feed）"]
+  ], settings.world.route);
+
   async function lock() {
     await vault.lock();
     state.vault = null;
@@ -1409,6 +1502,260 @@ function renderSettings() {
   }
 
   /**
+   * The family's own AI connection. The endpoint and key are sealed with the
+   * vault key and stay in this browser; the key is cleared from the form as soon
+   * as it is stored, so a re-render or a screenshot never carries it.
+   */
+  function aiConnectionCard() {
+    aiTemplate.addEventListener("change", () => {
+      settings.ai.template = aiTemplate.value;
+      const template = AI_CONNECTION_TEMPLATES.find((item) => item.id === settings.ai.template);
+      // A named template carries its own defaults; the custom one starts empty.
+      settings.ai.endpoint = template?.endpoint ?? "";
+      settings.ai.model = template?.model ?? "";
+      render();
+    });
+    aiRoute.addEventListener("change", () => {
+      settings.ai.route = aiRoute.value;
+      render();
+    });
+
+    async function save() {
+      state.message = null;
+      try {
+        await saveAiConnection({ vault, store: aiConnectionStore, settings: {
+          endpoint: settings.ai.endpoint,
+          apiKey: settings.ai.apiKey,
+          model: settings.ai.model,
+          route: settings.ai.route
+        } });
+        settings.ai.apiKey = "";
+        await refreshSources();
+        state.message = "AI 连接已保存在这台浏览器里，用保险箱密钥单独加密。";
+      } catch (error) {
+        state.message = error instanceof AiConnectionError
+          ? error.message
+          : "AI 连接没有保存，请再试一次";
+      }
+      render();
+    }
+
+    async function clear() {
+      await clearAiConnection({ store: aiConnectionStore, householdId: vault.householdId });
+      await refreshSources();
+      state.message = "已经清除这台浏览器上的 AI 连接。";
+      render();
+    }
+
+    return el("div", {}, [
+      field("服务模板", aiTemplate),
+      field("AI 服务地址", aiEndpoint),
+      field("AI 服务密钥", aiKey),
+      field("模型名称", aiModel),
+      field("调用方式", aiRoute),
+      el("p", { class: "card-text card-text--quiet", text: describeAiRoute({
+        route: settings.ai.route
+      }) }),
+      el("p", {
+        class: "card-text card-text--quiet",
+        text: "浏览器直连只适合家庭内网的自建服务。代理方式下，密钥只在一次请求的内存里经过 NAS，不落盘、不记日志，NAS 也无法读取它。"
+      }),
+      el("div", { class: "button-row" }, [
+        button("保存 AI 连接", save),
+        settings.ai.saved ? button("清除 AI 连接", clear, "text") : null
+      ])
+    ]);
+  }
+
+  /** The family's own World-information feed. Same boundary as the AI key. */
+  function worldConnectionCard() {
+    worldRoute.addEventListener("change", () => {
+      settings.world.route = worldRoute.value;
+      render();
+    });
+
+    async function save() {
+      state.message = null;
+      try {
+        await saveWorldConnection({ vault, store: worldConnectionStore, settings: {
+          feedUrl: settings.world.feedUrl,
+          region: settings.world.region,
+          route: settings.world.route
+        } });
+        await refreshSources();
+        state.message = "世界信息 feed 地址已保存在这台浏览器里。";
+      } catch (error) {
+        state.message = error instanceof WorldConnectionError
+          ? error.message
+          : "世界信息地址没有保存，请再试一次";
+      }
+      render();
+    }
+
+    async function clear() {
+      await clearWorldConnection({ store: worldConnectionStore, householdId: vault.householdId });
+      await refreshSources();
+      state.message = "已经清除这台浏览器上的世界信息 feed 地址。";
+      render();
+    }
+
+    return el("div", {}, [
+      field("feed 地址", worldUrl),
+      field("地区（可留空）", worldRegion),
+      field("拉取方式", worldRoute),
+      el("p", {
+        class: "card-text card-text--quiet",
+        text: "请求里只有地区、时间范围、语言和类别，不包含任何家庭信息、孩子姓名或兴趣内容。经 NAS 代理时只允许公共 HTTPS 地址。"
+      }),
+      el("div", { class: "button-row" }, [
+        button("保存世界信息地址", save),
+        settings.world.saved ? button("清除世界信息地址", clear, "text") : null
+      ])
+    ]);
+  }
+
+  /**
+   * The 16+ hand-over. The export is the person's own copy; the three retention
+   * outcomes are a separate, separately confirmed decision about the household
+   * copy (ADR 0007, ADR 0010).
+   */
+  function graduationCard() {
+    const graduates = vault.state.children.filter((child) => graduationNotice(child) !== null);
+    if (graduates.length === 0) return null;
+    if (!graduates.some((child) => child.id === settings.graduation.childId)) {
+      settings.graduation.childId = graduates[0].id;
+    }
+    const childId = settings.graduation.childId;
+    const child = vault.state.children.find((item) => item.id === childId);
+    if (!child) return null;
+    const retained = subjectAfterOutcome(vault.state, childId).retained;
+    const outcome = settings.graduation.outcome;
+
+    const person = select("graduate", graduates.map((item) => [item.id, item.displayName]), childId);
+    person.addEventListener("change", () => {
+      settings.graduation.childId = person.value;
+      settings.graduation.outcome = RETENTION_OUTCOMES.readOnly;
+      settings.graduation.phrase = "";
+      render();
+    });
+
+    async function exportArchive() {
+      state.message = null;
+      try {
+        const archive = buildGraduationArchive(vault.state, childId);
+        const { bundle, recoveryKey } = await sealGraduationBundle(archive);
+        downloadFile("jianyu-graduation-bundle.json", JSON.stringify(bundle, null, 2), "application/json");
+        // The same chronology the bundle carries inside it, written out
+        // unencrypted so the person can read it without any tooling.
+        downloadFile("jianyu-graduation-archive.md", archive.humanReadableMarkdown, "text/markdown");
+        // Shown once and never stored: the bundle is useless without it.
+        settings.graduation.exported = recoveryKey;
+      } catch (error) {
+        state.message = error instanceof GraduationError ? error.message : "导出没有完成，请再试一次";
+      }
+      render();
+    }
+
+    async function apply() {
+      state.message = null;
+      settings.graduation.applying = true;
+      render();
+      try {
+        const consent = createRetentionConsent(vault.state, {
+          childId,
+          // The author is the person themselves, never the current recorder.
+          authorId: child.memberId,
+          outcome,
+          phrase: settings.graduation.phrase
+        });
+        applyRetentionOutcome(vault.state, { childId, outcome, consent });
+        settings.graduation.phrase = "";
+        settings.graduation.outcome = RETENTION_OUTCOMES.readOnly;
+        await saveState();
+        state.message = outcome === RETENTION_OUTCOMES.deleteSubjectCopy
+          ? "本人的记录和关系都已从家庭副本中移除。这不会擦除已经导出的文件或 AI 服务持有的内容。"
+          : "这个人的经历记录已从家庭副本中移除，称呼和家庭关系保留。";
+      } catch (error) {
+        state.message = error instanceof GraduationError ? error.message : "这个操作没有完成，请再试一次";
+      }
+      settings.graduation.applying = false;
+      render();
+    }
+
+    const outcomes = [
+      [RETENTION_OUTCOMES.readOnly, "只读保留（默认）", "家庭副本保持原样，这个人的记录继续保留。"],
+      [RETENTION_OUTCOMES.relationshipOnly, "清经历，留关系", "移除这个人的经历记录，保留称呼和家庭关系。"],
+      [RETENTION_OUTCOMES.deleteSubjectCopy, "删除本人副本", "连关系一起从家庭副本中移除，无法恢复。"]
+    ];
+    const phrase = boundInput({
+      name: "retentionPhrase", autocomplete: "off", placeholder: RETENTION_CONFIRMATION_PHRASE
+    }, settings.graduation, "phrase");
+
+    return el("div", {}, [
+      settings.graduation.exported
+        ? card("human-decision", [
+          el("h3", { class: "card-title", text: "交接密钥（只显示这一次）" }),
+          el("p", { class: "card-text", text: settings.graduation.exported }),
+          el("p", {
+            class: "card-text",
+            text: "请把它和交接包文件一起保存在安全的地方。密钥和交接包分开放，丢掉密钥这份包就打不开了。关闭或刷新这个页面后不会再显示。"
+          }),
+          button("知道了", () => {
+            settings.graduation.exported = null;
+            render();
+          })
+        ])
+        : null,
+      field("本人", person),
+      el("p", {
+        class: "card-text card-text--quiet",
+        text: retained === "none"
+          ? "本人的记录和关系都已从家庭副本中移除。"
+          : retained === "relationship"
+            ? "已经清经历、留关系：经历记录已移除，称呼和家庭关系保留。"
+            : "家庭副本目前保留着这个人的全部记录。"
+      }),
+      button("导出本人的记录", exportArchive),
+      el("p", {
+        class: "card-text card-text--quiet",
+        text: "导出的是一个加密交接包和一份纯文本时间线，只包含这个人的记录。纯文本那份没有加密，会留在你选择的下载位置；能随身带走又打不开的那份是加密交接包。导出不改变家庭副本，也不需要先导出才能删除。"
+      }),
+      el("h3", { class: "card-title", text: "家庭副本保留方式" }),
+      el("div", { class: "picker" }, outcomes.map(([value, label, description]) =>
+        el("button", {
+          class: value === outcome ? "picker-item picker-item--active" : "picker-item",
+          type: "button",
+          "aria-pressed": value === outcome ? "true" : "false",
+          onClick: () => {
+            settings.graduation.outcome = value;
+            settings.graduation.phrase = "";
+            render();
+          }
+        }, [
+          el("span", { class: "list-title", text: label }),
+          el("span", { class: "list-meta", text: description })
+        ]))),
+      outcome === RETENTION_OUTCOMES.readOnly
+        ? el("p", { class: "card-text card-text--quiet", text: "只读保留不需要确认，它不改变任何记录。" })
+        : el("div", {}, [
+          field("确认语", phrase),
+          el("p", {
+            class: "card-text card-text--quiet",
+            text: "请由本人输入这句确认语。在共享设备上按一下不代表验证了身份，所以这条决定会记在本人名下。确认 5 分钟内有效。"
+          }),
+          button(settings.graduation.applying
+            ? "正在删除…"
+            : outcome === RETENTION_OUTCOMES.deleteSubjectCopy ? "确认删除本人副本" : "确认清经历，保留关系",
+          apply),
+          el("p", {
+            class: "card-text card-text--quiet",
+            text: "这只会从当前家庭副本中移除记录。已经导出的文件、其他设备上的旧副本、NAS 上的旧密文和 AI 服务持有的内容都不受影响，因此不称为加密擦除。"
+          })
+        ])
+    ]);
+  }
+
+  /**
    * The recovery bundle panel. Export shows the code once; import is a verified
    * preview followed by a separate confirmation, and never a merge.
    */
@@ -1468,6 +1815,26 @@ function renderSettings() {
       })
     ]),
     card("neutral", [
+      el("h2", { class: "card-title", text: "AI 连接" }),
+      el("p", {
+        class: "card-text",
+        text: settings.ai.saved
+          ? `这台浏览器已经保存了一个 AI 连接（模型 ${settings.ai.saved.model}）。`
+          : "还没有连接 AI。没有它也能用：离线演示始终可用，不发送、不保存。"
+      }),
+      aiConnectionCard()
+    ]),
+    card("neutral", [
+      el("h2", { class: "card-title", text: "世界信息" }),
+      el("p", {
+        class: "card-text",
+        text: settings.world.saved
+          ? "这台浏览器已经保存了一个世界信息 feed 地址。"
+          : "还没有配置世界信息 feed。没有它也能用：AI 和离线演示不受影响。"
+      }),
+      worldConnectionCard()
+    ]),
+    card("neutral", [
       el("h2", { class: "card-title", text: "机会来源" }),
       el("ul", { class: "list" }, [
         el("li", { class: "list-row" }, [
@@ -1499,6 +1866,13 @@ function renderSettings() {
         text: "导入是整体替换，不是合并：确认后这台浏览器里原来的家庭记录会被替换掉。恢复包本身不会改动服务器上的任何内容，登记到这台 NAS 是另一步、需要你单独确认的操作。"
       }),
       recoveryCard()
+    ]),
+    card("neutral", [
+      el("h2", { class: "card-title", text: "成年交接" }),
+      graduationCard() ?? el("p", {
+        class: "card-text",
+        text: "家庭里还没有 16 岁以上的人。到那时，这个人可以自己导出只属于他的记录，并决定家庭副本保留什么。"
+      })
     ]),
     card("neutral", [
       el("h2", { class: "card-title", text: "资料与设备" }),

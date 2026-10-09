@@ -15,8 +15,13 @@ export const OFFLINE_DEMO_PACK_ID = "org.jianyu.web.offline-demo";
 // A template only surfaces when the interest itself carries the child's pull,
 // which is what these terms test for. An expression that is only a refusal, or
 // only an adult's agenda, therefore produces no door at all.
+//
+// `currentInterestMentionsTerm` only matches a term of two characters or more,
+// because a single character appears in far too much ordinary speech to say
+// anything about the child's own pull. So single-character pull words are not
+// listed here: they would read as if they opened a door when they cannot.
 const PULL_TERMS = Object.freeze([
-  "喜欢", "想", "好奇", "问", "主动", "迷上", "感兴趣", "试试", "研究", "探索", "关注",
+  "喜欢", "好奇", "主动", "迷上", "感兴趣", "试试", "研究", "探索", "关注",
   "want", "like", "curious", "ask", "try", "explore", "interested"
 ]);
 

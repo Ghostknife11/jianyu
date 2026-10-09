@@ -108,8 +108,11 @@ function createIndexedDbStub() {
         const stores = new Map();
         database = {
           objectStoreNames: { contains: (storeName) => stores.has(storeName) },
-          createObjectStore(storeName) {
-            stores.set(storeName, new Map());
+          createObjectStore(storeName, options = {}) {
+            // The key path decides where a record is filed. The connection stores
+            // key on `householdId`, the vault on `id`, and a stub that filed
+            // everything under `id` would silently lose every connection record.
+            stores.set(storeName, { records: new Map(), keyPath: options.keyPath ?? "id" });
             return {};
           },
           transaction(storeName) {
@@ -121,12 +124,12 @@ function createIndexedDbStub() {
                 this.listeners.get(type).push(handler);
               },
               objectStore: () => ({
-                get: (key) => makeRequest(() => store.get(key)),
+                get: (key) => makeRequest(() => store.records.get(key)),
                 put: (value) => makeRequest(() => {
-                  store.set(value.id, structuredClone(value));
-                  return value.id;
+                  store.records.set(value[store.keyPath], structuredClone(value));
+                  return value[store.keyPath];
                 }),
-                delete: (key) => makeRequest(() => store.delete(key))
+                delete: (key) => makeRequest(() => store.records.delete(key))
               })
             };
             // The vault awaits its store operation before listening for
@@ -221,13 +224,16 @@ function installBrowserStubs() {
       this.text = async () => parts.join("");
     }
   };
-  globalThis.URL = {
+  // Only the two object-URL helpers are stubbed. Replacing the whole `URL`
+  // global would also take the constructor away, and the client parses a service
+  // address with `new URL(...)` before it will store it.
+  globalThis.URL = Object.assign(globalThis.URL, {
     createObjectURL: (blob) => {
       downloads.push(blob);
       return "blob:jianyu-recovery-bundle";
     },
     revokeObjectURL: () => {}
-  };
+  });
   globalThis.indexedDB = createIndexedDbStub();
   globalThis.fetch = async (url, options = {}) => {
     const path = String(url);
@@ -268,6 +274,16 @@ function buttonByLabel(label) {
 function firstRefusalButton() {
   const matches = main().descendants().filter((node) => node.tagName === "BUTTON" && node.text() === "孩子不想要");
   assert.ok(matches.length >= 1, "each door must offer the child's own refusal");
+  return matches[0];
+}
+
+/**
+ * A button whose label is built from a label and a description, so it is
+ * addressed by the part that is unique to it.
+ */
+function buttonContaining(text) {
+  const matches = main().descendants().filter((node) => node.tagName === "BUTTON" && node.text().includes(text));
+  assert.equal(matches.length, 1, `expected exactly one button containing ${text}`);
   return matches[0];
 }
 
@@ -332,6 +348,8 @@ describe("NAS web bootstrap", () => {
     delete globalThis.indexedDB;
     delete globalThis.fetch;
     delete globalThis.Blob;
+    delete globalThis.URL.createObjectURL;
+    delete globalThis.URL.revokeObjectURL;
     delete globalThis.URL;
   });
 
@@ -632,6 +650,185 @@ describe("NAS web bootstrap", () => {
     assert.match(text, /阶段按出生日期计算，生日当天自动切换/u);
     assert.match(text, /不作为能力评分/u);
     assert.match(text, /按一下不代表验证了身份/u);
+  });
+
+  // The two service settings are browser-local, sealed with the vault key, and
+  // never part of the family state.
+  it("keeps an AI connection in this browser and never sends its key", async () => {
+    buttonByLabel("设置").dispatch("click");
+    await settle("AI 连接");
+
+    inputByName("aiEndpoint").value = "https://api.deepseek.com/v1/chat/completions";
+    inputByName("aiEndpoint").dispatch("input");
+    inputByName("aiKey").value = "synthetic-provider-key-value";
+    inputByName("aiKey").dispatch("input");
+    inputByName("aiModel").value = "deepseek-chat";
+    inputByName("aiModel").dispatch("input");
+    buttonByLabel("保存 AI 连接").dispatch("click");
+    await settle("AI 连接已保存在这台浏览器里");
+
+    for (const request of requests) {
+      const body = typeof request.body === "string" ? request.body : "";
+      assert.ok(!body.includes("synthetic-provider-key-value"), "a provider key must never be sent to the server");
+    }
+    // Reading it back is what makes the source list on Today honest.
+    assert.match(main().text(), /AI 发现\s+已连接这台浏览器/u);
+    assert.equal(inputByName("aiKey").value, "", "the key is cleared from the form once it is sealed");
+  });
+
+  it("refuses an AI address the NAS proxy would refuse", async () => {
+    // The key is cleared once stored, so it is entered again here.
+    inputByName("aiEndpoint").value = "http://api.example.com/v1/chat/completions";
+    inputByName("aiEndpoint").dispatch("input");
+    inputByName("aiKey").value = "synthetic-provider-key-value";
+    inputByName("aiKey").dispatch("input");
+    buttonByLabel("保存 AI 连接").dispatch("click");
+    const text = await settle("必须使用 HTTPS");
+    assert.match(text, /AI 服务地址 地址必须使用 HTTPS/u);
+    assert.match(text, /AI 发现\s+已连接这台浏览器/u, "the connection already stored is untouched");
+  });
+
+  it("clears the AI connection and keeps the world feed separate", async () => {
+    buttonByLabel("清除 AI 连接").dispatch("click");
+    await settle("已经清除这台浏览器上的 AI 连接");
+    assert.match(main().text(), /还没有连接 AI/u);
+
+    inputByName("worldUrl").value = "https://feeds.example.org/jianyu/world.json";
+    inputByName("worldUrl").dispatch("input");
+    inputByName("worldRegion").value = "华东";
+    inputByName("worldRegion").dispatch("input");
+    buttonByLabel("保存世界信息地址").dispatch("click");
+    await settle("世界信息 feed 地址已保存在这台浏览器里");
+
+    assert.match(main().text(), /AI 发现\s+未连接/u);
+    assert.match(main().text(), /世界信息\s+已连接这台浏览器/u);
+    for (const request of requests) {
+      assert.ok(!String(request.path).includes("feeds.example.org"), "the feed address is not fetched while saving it");
+    }
+
+    buttonByLabel("清除世界信息地址").dispatch("click");
+    await settle("已经清除这台浏览器上的世界信息 feed 地址");
+    assert.match(main().text(), /还没有配置世界信息 feed/u);
+  });
+
+  // The 16+ hand-over: the person's own copy, and a separately confirmed
+  // decision about the household copy (ADR 0007, ADR 0010).
+  it("hands a 16+ person their own export without touching the household copy", async () => {
+    buttonByLabel("家庭").dispatch("click");
+    await settle("添加孩子");
+    inputByName("childName").value = "阿隅";
+    inputByName("birthDate").value = "2008-04-02";
+    buttonByLabel("添加孩子").dispatch("click");
+    await settle("阿隅");
+
+    // One record about this person, so the export has something to carry.
+    buttonByLabel("今天").dispatch("click");
+    await settle("记下这句话");
+    buttonByLabel("切换查看人").dispatch("click");
+    await settle("阿隅");
+    pickerItem("阿隅").dispatch("click");
+    await settle("记下这句话");
+    const expression = inputByName("expression");
+    expression.value = "阿隅主动说想自己决定周末做什么";
+    expression.dispatch("input");
+    buttonByLabel("记下这句话，看看有几扇门").dispatch("click");
+    await settle("确认这次寻找");
+    buttonByLabel("确认，开始这次寻找").dispatch("click");
+    await settle("选这个");
+    buttonByLabel("这次就什么都不做").dispatch("click");
+    await settle("这次就停在这里");
+    assert.match(main().text(), /这个阶段不再追加关于童年的新看法/u);
+
+    buttonByLabel("回望").dispatch("click");
+    assert.match(await settle("家庭足迹"), /阿隅主动说想自己决定周末做什么/u);
+
+    buttonByLabel("设置").dispatch("click");
+    await settle("成年交接");
+    const before = downloads.length;
+    buttonByLabel("导出本人的记录").dispatch("click");
+    const shown = await settle("交接密钥（只显示这一次）");
+
+    // 32 bytes of base64url without padding, which is what the canonical
+    // envelope and its recovery key use.
+    const key = shown.match(/(?:^|[^A-Za-z0-9_-])([A-Za-z0-9_-]{43})(?![A-Za-z0-9_-])/u);
+    assert.ok(key, "the archive key is shown once");
+    assert.equal(downloads.length, before + 2, "an encrypted bundle and a readable chronology");
+    const bundleText = await downloads[before].text();
+    const markdownText = await downloads[before + 1].text();
+    assert.match(bundleText, /org\.foe\.encrypted-graduation-bundle\/v1/u);
+    assert.match(markdownText, /阿隅的见隅记录/u);
+    // The bundle carries no name, no words, and no key.
+    for (const secret of ["阿隅", "周末", key[0]]) {
+      assert.ok(!bundleText.includes(secret), `the bundle must not contain ${secret}`);
+    }
+    assert.match(markdownText, /这份导出是记录，不是评价/u);
+    // Exporting is not deleting: the household copy is still intact.
+    buttonByLabel("知道了").dispatch("click");
+    await settle("家庭副本目前保留着这个人的全部记录");
+    buttonByLabel("回望").dispatch("click");
+    assert.match(await settle("家庭足迹"), /阿隅主动说想自己决定周末做什么/u);
+  });
+
+  it("requires the person's own phrase before the household copy changes", async () => {
+    buttonByLabel("设置").dispatch("click");
+    await settle("成年交接");
+    buttonContaining("清经历，留关系").dispatch("click");
+    const armed = await settle("确认清经历，保留关系");
+
+    // The destructive panel states its own limits before anything happens.
+    assert.match(armed, /请由本人输入这句确认语/u);
+    assert.match(armed, /这条决定会记在本人名下/u);
+    assert.match(armed, /确认 5 分钟内有效/u);
+    assert.match(armed, /因此不称为加密擦除/u);
+
+    buttonByLabel("确认清经历，保留关系").dispatch("click");
+    assert.match(await settle("请先输入确认语"), /请先输入确认语/u);
+    assert.match(main().text(), /家庭副本目前保留着这个人的全部记录/u, "nothing changed yet");
+
+    inputByName("retentionPhrase").value = "我确认删除";
+    inputByName("retentionPhrase").dispatch("input");
+    buttonByLabel("确认清经历，保留关系").dispatch("click");
+    assert.match(await settle("请先输入确认语"), /请先输入确认语/u);
+  });
+
+  it("keeps the relationship while the person's history leaves the household copy", async () => {
+    buttonByLabel("设置").dispatch("click");
+    await settle("成年交接");
+    buttonContaining("清经历，留关系").dispatch("click");
+    await settle("确认清经历，保留关系");
+    inputByName("retentionPhrase").value = "我确认删除这份家庭副本";
+    inputByName("retentionPhrase").dispatch("input");
+    buttonByLabel("确认清经历，保留关系").dispatch("click");
+    const text = await settle("称呼和家庭关系保留");
+
+    assert.match(text, /这个人的经历记录已从家庭副本中移除，称呼和家庭关系保留/u);
+    assert.match(main().text(), /已经清经历、留关系/u);
+
+    buttonByLabel("家庭").dispatch("click");
+    assert.match(await settle("阿隅"), /阿隅 · 18 岁/u, "the relationship stays");
+
+    buttonByLabel("回望").dispatch("click");
+    const footprint = await settle("家庭足迹");
+    assert.equal(footprint.includes("阿隅主动说想自己决定周末做什么"), false, "the history is gone");
+    assert.match(footprint, /二宝|小隅|三宝/u, "the rest of the family's records stay");
+  });
+
+  it("deletes the household subject copy only after the same confirmation", async () => {
+    buttonByLabel("设置").dispatch("click");
+    await settle("成年交接");
+    buttonContaining("连关系一起从家庭副本中移除").dispatch("click");
+    await settle("确认删除本人副本");
+    inputByName("retentionPhrase").value = "我确认删除这份家庭副本";
+    inputByName("retentionPhrase").dispatch("input");
+    buttonByLabel("确认删除本人副本").dispatch("click");
+    const text = await settle("本人的记录和关系都已从家庭副本中移除");
+
+    assert.match(text, /这不会擦除已经导出的文件或 AI 服务持有的内容/u);
+    // The person is gone from the household, and nothing is left to hand over.
+    buttonByLabel("家庭").dispatch("click");
+    assert.equal((await settle("阶段按出生日期计算")).includes("阿隅"), false);
+    buttonByLabel("设置").dispatch("click");
+    assert.match(await settle("成年交接"), /家庭里还没有 16 岁以上的人/u);
   });
 
   it("navigates to settings and erases only after a second confirmation", async () => {
