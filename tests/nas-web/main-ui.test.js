@@ -264,9 +264,25 @@ function buttonByLabel(label) {
   return matches[0];
 }
 
+/** Every door carries its own refusal, so address the first one directly. */
+function firstRefusalButton() {
+  const matches = main().descendants().filter((node) => node.tagName === "BUTTON" && node.text() === "孩子不想要");
+  assert.ok(matches.length >= 1, "each door must offer the child's own refusal");
+  return matches[0];
+}
+
 function inputByName(name) {
   const matches = findByAttribute(main(), "name", name);
   assert.equal(matches.length, 1, `expected exactly one input named ${name}`);
+  return matches[0];
+}
+
+/** The switcher's rows carry the name and the stage, so match on the name span. */
+function pickerItem(name) {
+  const matches = main().descendants().filter((node) =>
+    /(^|\s)picker-item(\s|$)/.test(node.className) &&
+    node.descendants().some((child) => child.className === "list-title" && child.textContent === name));
+  assert.equal(matches.length, 1, `expected exactly one child named ${name} in the switcher`);
   return matches[0];
 }
 
@@ -399,6 +415,135 @@ describe("NAS web bootstrap", () => {
     buttonByLabel("确认替换").dispatch("click");
     await settle("预览之后这台浏览器里的记录又变了");
     assert.match(main().text(), /预览之后这台浏览器里的记录又变了/);
+  });
+
+  // The Today flow, driven through the same bootstrap. What matters here is the
+  // order of operations a family depends on: the words are written down before
+  // any provider could be contacted, the confirmation is a separate step, and one
+  // search yields at most one durable decision.
+  it("opens on the child's own words and names the offline boundary", async () => {
+    buttonByLabel("今天").dispatch("click");
+    const text = await settle("记下这句话");
+    assert.match(text, /这次/, "the current occasion is labelled 这次");
+    assert.match(text, /离线演示 · 不发送、不保存/u, "the source state is stated before anything happens");
+    assert.match(text, /孩子当下在意的内容/u);
+    // No ranking, no count of saved observations, no progress meter.
+    assert.equal(text.includes("0/800"), false);
+    assert.equal(text.includes("推荐"), false);
+  });
+
+  it("writes the child's words before any provider could be contacted", async () => {
+    const stateWrites = () => requests.filter((request) => request.path === "/api/state" && request.method === "PUT").length;
+    const proxyCalls = () => requests.filter((request) => request.path.startsWith("/api/proxy/")).length;
+    const writesBefore = stateWrites();
+    const proxyBefore = proxyCalls();
+
+    const expression = inputByName("expression");
+    expression.value = "孩子最近主动说自己很喜欢赛车，想弄明白轮胎为什么能抓地";
+    expression.dispatch("input");
+    buttonByLabel("记下这句话，看看有几扇门").dispatch("click");
+    const text = await settle("确认这次寻找");
+
+    assert.match(text, /确认这次寻找/u);
+    assert.equal(proxyCalls(), proxyBefore, "no provider is contacted at the composer step");
+    assert.equal(stateWrites(), writesBefore + 1, "the sentence and its scope are sealed into the vault first");
+    // The confirmation is a separate step, and it names the three roles.
+    assert.match(text, /AI 找入口，本机筛选；你\/你们来选/u);
+    assert.match(text, /离线演示不发送任何内容/u);
+  });
+
+  it("shows exactly what would be sent behind one disclosure", async () => {
+    buttonByLabel("查看会发送的内容").dispatch("click");
+    const text = await settle("不包含孩子和家庭的称呼");
+    assert.match(text, /孩子当下在意的内容/u);
+    assert.match(text, /不包含孩子和家庭的称呼/u);
+  });
+
+  it("offers doors plus 留白 and records the family's choice", async () => {
+    buttonByLabel("确认，开始这次寻找").dispatch("click");
+    const result = await settle("选这个");
+
+    // Several doors and 留白, with no ordinal numbering or quality claim.
+    const doors = main().descendants().filter((node) => node.className === "door-title");
+    assert.ok(doors.length >= 3, "the offline demonstration offers more than one door");
+    for (const door of doors) {
+      assert.equal(/^\d/.test(door.textContent), false, "a door carries no ordinal number");
+    }
+    assert.match(result, /什么都不做/u, "留白 is offered alongside the doors");
+    assert.match(result, /选它不需要时间、花费或家长的精力/u);
+    assert.match(result, /留白是一个完整的选择，不是放弃/u);
+    assert.match(result, /这次就什么都不做/u);
+
+    buttonByLabel("这次就什么都不做").dispatch("click");
+    const acknowledged = await settle("这次就停在这里");
+    assert.match(acknowledged, /这次就停在这里/u);
+    assert.match(acknowledged, /也不会产生任何欠账/u);
+    // The first child is 13, so the view is signed by the child themselves.
+    assert.match(acknowledged, /我想留个看法/u, "a 13–15 year old signs their own view");
+    assert.match(acknowledged, /写不写都可以/u);
+  });
+
+  it("leaves an optional later view and then returns to a fresh occasion", async () => {
+    const view = inputByName("laterView");
+    view.value = "孩子后来说想再看看轮胎花纹";
+    view.dispatch("input");
+    buttonByLabel("留下这个看法").dispatch("click");
+    await settle("记下这句话");
+
+    // Back at the composer with the draft cleared, ready for the next occasion.
+    assert.match(main().text(), /记下这句话，看看有几扇门/u);
+    assert.equal(inputByName("expression").value, "", "a saved choice clears that occasion's draft");
+  });
+
+  it("requires a separate confirmation before writing a refusal", async () => {
+    const expression = inputByName("expression");
+    expression.value = "孩子主动说想去看看赛车场";
+    expression.dispatch("input");
+    buttonByLabel("记下这句话，看看有几扇门").dispatch("click");
+    await settle("确认这次寻找");
+    buttonByLabel("确认，开始这次寻找").dispatch("click");
+    await settle("选这个");
+
+    firstRefusalButton().dispatch("click");
+    const veto = await settle("确认记下这份拒绝？");
+    assert.match(veto, /和家长只是暂时不想做是两回事/u);
+    assert.match(veto, /每次调用前你都可以再否决/u);
+
+    buttonByLabel("确认记下").dispatch("click");
+    const after = await settle("已经记下这份拒绝");
+    assert.match(after, /已经记下这份拒绝/u);
+    assert.equal(
+      main().descendants().filter((node) => node.className === "door-title").length,
+      0,
+      "a refusal is a durable decision, so the doors are gone"
+    );
+  });
+
+  it("keeps one unsent sentence per child when the viewed person changes", async () => {
+    buttonByLabel("家庭").dispatch("click");
+    await settle("添加孩子");
+    inputByName("childName").value = "二宝";
+    inputByName("birthDate").value = "2016-05-20";
+    buttonByLabel("添加孩子").dispatch("click");
+    await settle("二宝");
+
+    buttonByLabel("今天").dispatch("click");
+    await settle("记下这句话");
+    const first = inputByName("expression");
+    first.value = "小隅说想研究赛车";
+    first.dispatch("input");
+
+    buttonByLabel("切换查看人").dispatch("click");
+    await settle("二宝");
+    pickerItem("二宝").dispatch("click");
+    await settle("记下这句话");
+    assert.equal(inputByName("expression").value, "", "another child's draft is never shown here");
+
+    buttonByLabel("切换查看人").dispatch("click");
+    await settle("小隅");
+    pickerItem("小隅").dispatch("click");
+    await settle("记下这句话");
+    assert.equal(inputByName("expression").value, "小隅说想研究赛车", "the draft comes back with its own child");
   });
 
   it("navigates to settings and erases only after a second confirmation", async () => {
