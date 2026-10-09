@@ -112,6 +112,14 @@ OMV 用 `compose` 插件或者 `portainer` 插件都可以，注意 compose 文�
 
 ---
 
+## 基础镜像从哪来
+
+镜像的 `FROM` 写的是 Amazon ECR Public 上的 `public.ecr.aws/docker/library/node:22-alpine`，并带一个 SHA-256 摘要固定。选它只是因为 Docker Hub 会限制匿名拉取的频率，公共构建机一多就拉不动；对你在自己 NAS 上构建没有别的影响。
+
+摘要和 `docker.io/library/node:22-alpine` 发布的是同一个，两个仓库的 manifest 和每一层都逐字节比对过，所以摘要固定依然精确指定了要跑的字节。把 `FROM` 换回 `docker.io/library/node:22-alpine@sha256:0a7108bf…` 构建出来的是同一个镜像。镜像里没有包管理器、没有 npm 依赖，容器以非 root 用户运行。
+
+---
+
 ## 从外网访问：TLS 必须由反向代理终止
 
 容器默认只听 HTTP。**不要**把 8080 直接暴露到公网——口令和密文都会以明文过网。做法是在 NAS 的反向代理上终止 TLS，再把请求转发到 8080：

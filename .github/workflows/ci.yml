@@ -59,8 +59,8 @@ jobs:
         run: node --test "tests/nas-web/*.test.js"
       - name: Build the self-hosted image
         run: |
-          # The pinned base digest is pulled on its own before the build. Docker Hub
-          # answers anonymous pulls with 429 and its token endpoint with the odd 5xx,
+          # Pull the pinned base digest on its own before building. Registries
+          # answer shared build-farm addresses with rate limits and transient 5xx,
           # and neither says anything about this image, so a registry hiccup should
           # not read as a broken build. Pulling first also means a genuine Dockerfile
           # defect still fails on the first attempt, with nothing left to download.

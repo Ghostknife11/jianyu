@@ -4,7 +4,13 @@
 # the shared engine packages by relative path. The image contains no package
 # manager, no npm dependencies, and no build step.
 
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+# Amazon ECR Public mirrors Docker Hub's official images. It is used here only
+# because Docker Hub rate-limits anonymous pulls from the shared egress
+# addresses that public build farms use, which left this image unbuildable. The
+# digest is unchanged and both registries serve byte-identical manifests and
+# layers for it, so the pin still names the exact bytes that run; substituting
+# the docker.io reference builds the same image.
+FROM public.ecr.aws/docker/library/node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
 
 WORKDIR /app
 
