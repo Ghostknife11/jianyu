@@ -12,6 +12,7 @@ COPY apps/jianyu-web-nas ./apps/jianyu-web-nas
 COPY packages/foe-core/src ./packages/foe-core/src
 COPY packages/foe-opportunity/src ./packages/foe-opportunity/src
 COPY packages/foe-schema/src ./packages/foe-schema/src
+COPY packages/foe-vault/src ./packages/foe-vault/src
 COPY packages/pack-sdk/src ./packages/pack-sdk/src
 COPY packages/policy-sdk/src ./packages/policy-sdk/src
 COPY packages/provider-sdk/src ./packages/provider-sdk/src

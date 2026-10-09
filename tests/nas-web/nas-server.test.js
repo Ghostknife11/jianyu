@@ -1,100 +1,20 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
-import { loadConfig } from "../../apps/jianyu-web-nas/server/config.mjs";
-import { createJianyuNasServer } from "../../apps/jianyu-web-nas/server/server.mjs";
-
-function baseConfig(overrides = {}) {
-  return {
-    ...loadConfig({}),
-    host: "127.0.0.1",
-    port: 0,
-    insecureHttp: true,
-    ...overrides
-  };
-}
-
-async function startServer(overrides) {
-  const dataDir = await mkdtemp(join(tmpdir(), "jianyu-nas-test-"));
-  const app = createJianyuNasServer(baseConfig({ dataDir, ...overrides }));
-  const address = await app.listen();
-  return { app, baseUrl: `http://127.0.0.1:${address.port}`, dataDir };
-}
-
-async function stopServer(instance) {
-  await instance.app.close();
-  await rm(instance.dataDir, { recursive: true, force: true });
-}
-
-class Session {
-  constructor(baseUrl) {
-    this.baseUrl = baseUrl;
-    this.cookie = null;
-  }
-
-  async request(path, options = {}) {
-    const headers = { ...options.headers };
-    if (this.cookie) headers.cookie = this.cookie;
-    const response = await fetch(`${this.baseUrl}${path}`, { ...options, headers });
-    for (const value of response.headers.getSetCookie?.() ?? []) {
-      this.cookie = value.split(";")[0];
-    }
-    return response;
-  }
-
-  async json(path, options = {}) {
-    const response = await this.request(path, options);
-    const body = await response.json().catch(() => null);
-    return { status: response.status, body };
-  }
-}
-
-function deterministicHex(byteLength) {
-  const bytes = new Uint8Array(byteLength);
-  for (let index = 0; index < byteLength; index += 1) bytes[index] = (index * 7 + 11) % 256;
-  return Buffer.from(bytes).toString("hex");
-}
-
-function registrationBody() {
-  return {
-    householdId: "AaBbCcDdEeFfGgHh12345678",
-    verifier: deterministicHex(32),
-    salt: Buffer.from("jianyu-test-salt").toString("base64"),
-    iterations: 210_000
-  };
-}
-
-function jsonPost(body) {
-  return {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
-  };
-}
-
-function statePut(objectId, baseVersion) {
-  return {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ objectId, baseVersion })
-  };
-}
-
-function bytesBody(bytes) {
-  return {
-    method: "PUT",
-    headers: { "content-type": "application/octet-stream" },
-    body: Buffer.from(bytes)
-  };
-}
-
-function objectId(filler) {
-  return filler.repeat(24);
-}
+import {
+  baseConfig,
+  bytesBody,
+  deterministicHex,
+  jsonPost,
+  objectId,
+  registrationBody,
+  Session,
+  startServer,
+  statePut,
+  stopServer
+} from "./helpers.mjs";
 
 async function unlock(session) {
   const body = registrationBody();

@@ -35,6 +35,7 @@ const STATIC_PREFIXES = [
   "/packages/foe-core/src/",
   "/packages/foe-opportunity/src/",
   "/packages/foe-schema/src/",
+  "/packages/foe-vault/src/",
   "/packages/pack-sdk/src/",
   "/packages/policy-sdk/src/",
   "/packages/provider-sdk/src/",

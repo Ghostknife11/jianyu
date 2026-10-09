@@ -224,3 +224,80 @@ select {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.brand-status--warning {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.card-text {
+  margin: 0;
+  color: inherit;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 14px;
+  color: var(--on-surface-variant);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.list-title {
+  font-weight: 600;
+}
+
+.list-meta {
+  font-size: 14px;
+  color: var(--on-surface-variant);
+}
+
+.nav {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 4px;
+  padding: 6px var(--gutter) calc(6px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--outline);
+  background: var(--surface-container);
+}
+
+.nav-item {
+  flex: 1;
+  min-height: var(--touch-target);
+  border-radius: 12px;
+  background: none;
+  color: var(--on-surface-variant);
+  font-weight: 500;
+}
+
+.nav-item--active {
+  background: var(--discovery-container);
+  color: var(--on-discovery-container);
+  font-weight: 600;
+}
