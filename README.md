@@ -78,6 +78,7 @@ The reference app must never become the only practical implementation. Forks and
 
 ```text
 apps/jianyu-android/          Native Jianyu Android app
+apps/jianyu-web-nas/          Self-hosted Docker web app for a family NAS
 apps/jianyu-web-prototype/    Interaction/domain prototype, not the primary app
 packages/foe-core/            Stable domain core
 packages/foe-opportunity/     Discovery, Gate, and Diversity
@@ -91,6 +92,12 @@ docs/adr/                     Architecture decisions
 examples/                     Synthetic examples
 tests/                        Conformance, privacy, security, and migration tests
 ```
+
+## Self-hosted web app on a family NAS
+
+`apps/jianyu-web-nas` runs the same engine in a browser, from one Docker container on a NAS the family already owns. Decryption, the Context Firewall, the Gate, and diversity selection all happen in the browser using `packages/*`; the NAS stores ciphertext only, and a labeled transient proxy exists because browser-direct OpenAI-compatible calls are blocked by CORS. The server sees ciphertext and its sizes, object counts, request timing, IP addresses, the session cookie, and — during a proxied AI call — the provider key and minimized task context in memory for that call only.
+
+It is a **developer preview**: no independent security review, no production multi-device sync (one active writer with conflict-reload merge, not automatic sync), and PBKDF2 rather than a memory-hard KDF. It claims Opportunity-compatible engine behavior and does **not** claim Import-, Round-trip-, or Sync-compatibility with the Android app; its recovery bundle and the Android one are separate formats. See [apps/jianyu-web-nas/README.md](apps/jianyu-web-nas/README.md) for deployment, per-brand NAS steps, reverse-proxy TLS, backup, and the full list of what is not claimed.
 
 ## Native Android App
 

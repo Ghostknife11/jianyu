@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<title>见隅 · 家庭保险箱</title>
+<link rel="stylesheet" href="/apps/jianyu-web-nas/web/styles.css">
+</head>
+<body>
+<div id="app" class="app-shell" data-state="booting">
+  <header class="app-bar">
+    <span class="brand-mark" aria-hidden="true">隅</span>
+    <span class="brand-name">见隅</span>
+    <span class="brand-status" id="brand-status">加密保存在你的 NAS</span>
+  </header>
+
+  <main id="main" class="page">
+    <section class="card card--neutral">
+      <h1 class="page-title">正在载入家庭保险箱</h1>
+      <p class="page-description">浏览器正在准备解密密钥。家庭数据在离开这台设备前就已加密，NAS 上只保存密文。</p>
+    </section>
+  </main>
+
+  <!-- Outside #main on purpose: a message that is thrown away together with its
+       own card is never announced, so the live region has to outlive re-renders. -->
+  <div id="live-region" class="visually-hidden" role="status" aria-live="polite"></div>
+
+  <noscript>
+    <section class="card card--danger">
+      <h1 class="page-title">需要启用 JavaScript</h1>
+      <p class="page-description">见隅的解密、本机检查与家庭选择都在浏览器里完成，没有 JavaScript 就无法打开家庭保险箱。</p>
+    </section>
+  </noscript>
+</div>
+<script type="module" src="/apps/jianyu-web-nas/web/src/main.js"></script>
+</body>
+</html>

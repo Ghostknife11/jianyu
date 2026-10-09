@@ -2,6 +2,8 @@
 
 > The official reference client is the native Kotlin/Compose project in `apps/jianyu-android`. The browser project in `apps/jianyu-web-prototype` is an interaction prototype only. See `docs/adr/0002-native-android-reference-app.md`.
 
+> `apps/jianyu-web-nas` is a second reference client: a self-hosted Docker web app that runs the same public engine in a browser and stores ciphertext only. It is a developer preview, not production multi-device sync, and it is not Import-, Round-trip-, or Sync-compatible with the Android app. See `docs/adr/0028-self-hosted-web-runtime-for-family-nas.md` through `0030`.
+
 ## 1. Product before infrastructure
 
 Family Opportunity Engine exists to help a family notice a small number of worthwhile entry points that it might otherwise miss. Privacy, storage, and extensibility protect that capability; they are not the product's center.

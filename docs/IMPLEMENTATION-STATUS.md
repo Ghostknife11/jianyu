@@ -2,6 +2,34 @@
 
 This file records what the current repository proves, what is only a boundary or fixture, and what must not yet be claimed. It is intentionally stricter than a roadmap.
 
+## Self-hosted NAS web app (2026-10-10)
+
+`apps/jianyu-web-nas` adds a second reference product: one Docker container that serves an unbuilt ESM browser client and stores ciphertext only. ADRs 0028 (self-hosted runtime), 0029 (ciphertext-only store and labeled transient proxy), and 0030 (web family-state v1, recovery bundle, compatibility stance) record the decisions; the implementation order is not repeated here.
+
+What the current branch proves, with 300 JavaScript tests passing under `node --test "tests/**/*.test.js"` and `node scripts/check.mjs` on 77 modules:
+
+- The browser derives two domain-separated PBKDF2-SHA-256 keys (210,000 iterations) from the passphrase and a random salt. The server stores only a random household ID, the salt, the iteration count, and `SHA-256(verifier)`; the vault key never leaves the browser. The state object is sealed with AES-256-GCM under associated data binding the format, household ID, and state version.
+- Registration, unlock, lock, and destroy are exercised end to end through a DOM stand-in that drives the real bootstrap module, so a button that renders but never fires its handler is a failing test rather than a silent gap.
+- The object store is immutable per opaque ID, cursor-paginated with a hard ceiling, and fail-closed on same-ID-different-bytes. Unlock and registration failures are throttled per IP and per household with delay only, never a lockout that could strand data. Session tokens are stored server-side only as SHA-256 hashes and delivered as `HttpOnly`, `SameSite=Strict` cookies, `Secure` unless `JIANYU_INSECURE_HTTP=1` is set for local plain-HTTP testing.
+- Writes are single-active-writer: a stale `baseVersion` is refused and the UI offers reload-and-merge via the public `mergeFamilyState`, with tombstones dominating. The screen says another device changed the records; it does not claim automatic sync.
+- The recovery bundle `org.jianyu.web-recovery-bundle/v1` is verified locally first, then previewed with both household names, then replaced on a separate confirmation. A wrong code, or any local change after the preview, leaves the existing vault untouched. The bundle has no server-side effect by itself; registering it on a NAS is a separate explicit action.
+- Discovery reuses the public engine: Context Firewall minimization, exact `PublicWorldQuery` matching, unsourced AI world-event refusal, Gate reasons, diversity, and first-class 留白 are all covered by the shared conformance tests plus web-specific ones. The offline demo sends nothing and saves nothing, and its pull terms are only the ones the shared matcher can actually fire.
+- The 16+ hand-over projects the canonical `org.foe.graduation-archive/v2` inside `org.foe.encrypted-graduation-bundle/v1`, with the base64url encoding and AAD binding the Android reference reader uses, so the container a family holds is the one DATA-SCHEMA.md §13 describes. All three ADR 0010 retention outcomes are available, each behind a fresh subject-matched consent, the typed phrase, and a five-minute expiry.
+- The UI pass converted sizes to rem so the browser's font setting scales padding and touch targets, added a `forced-colors` block, gave the disclosure toggle `aria-expanded` and a region it names, and mirrored messages into a live region outside the re-rendered main region. Stage labels, credential labels, and footprint wording were aligned with `docs/UI-SYSTEM.md`.
+- The CI `nas-web-reference` job builds the digest-pinned image, writes through the real image on a fresh volume as the non-root account, starts the container on a scratch volume, waits for the health check, checks the served client and its security headers, rejects path traversal, requires authentication for `/api/households/me`, and asserts the data volume holds nothing beyond `households/`, `sessions/`, and `objects/`. The base image is pulled from the Amazon ECR Public mirror of Docker Hub's official images because Docker Hub rate-limits anonymous pulls from shared build-farm addresses; the digest is unchanged and both registries serve byte-identical manifests and layers, so the pin still determines the bytes that run.
+- [Run 37996395774](https://github.com/Ghostknife11/jianyu/actions/runs/37996395774) on `db6d9db` passed all four remote jobs, including every `nas-web-reference` step above. This is the first run in which the container smoke check actually executed; the two earlier attempts on this branch failed on the base-image pull, first with Docker Hub 429 rate limiting and then with 504s from its token endpoint. Getting it to run surfaced two real defects that the local checks had missed: the image was unbuildable from shared build-farm addresses, and `/data` was root-owned, which left the non-root server unable to create its own directories in every named-volume deployment, including the documented compose and `docker run` quick starts. Both are fixed and now covered by CI. No image is published, signed, or accompanied by an SBOM.
+
+What it does **not** prove and must not be claimed:
+
+- **No independent security review.** None of the SECURITY.md §10 gates is met: no implemented threat-model test matrix, no independent review of key management or sync encryption, no Pack/World-Brief adversarial or parser-fuzz fixtures, no backup/stale-device/revocation drills, no signed release artifacts.
+- **Not production multi-device sync.** One active writer with conflict-reload merge is the whole story.
+- **PBKDF2 is not memory-hard.** An Argon2id migration needs its own ADR, test vectors, and review before real family data. This is why the app is labeled a developer preview.
+- **No child-held independent keys.** A holder of the household key or the recovery bundle can read the contents, the same boundary the Android app states.
+- **Not compatible with the Android app.** The state formats differ and no cross-client fixture exists. The claimed level is Opportunity-compatible at the engine level. The graduation bundle's *container* is canonical, but the record vocabulary inside is this app's own `org.foe.event/v1` payloads, which another App's reader may narrow, so handing a bundle to the Android App is not claimed either.
+- **No model recommendation quality.** The offline demo is fixed templates, labeled as a preview, sending and saving nothing.
+- **Residual metadata.** Ciphertext size and count, request timing, and IP addresses remain visible to the server, as SECURITY.md notes for any sync backend.
+- **No published, signed, or attested image.** CI builds the image and runs the container checks but publishes nothing. There is no SBOM, no image signature, and no independent review of the container or of the base image it pulls.
+
 ## Publication preflight (2026-10-04)
 
 The curated first local commit, `6da6a5b`, contains 281 source and documentation files and no local toolchain, build output, signing key, or family vault. A Gitleaks 8.30.1 scan of that actual one-commit history found no leaks. A fresh local clone of the commit passed 123 public JavaScript tests, all Android JVM tests, Debug and unsigned Release builds, both lint variants, the dedicated disposable-emulator suite of 49 instrumented tests, and the isolated browser-prototype smoke journey. Earlier, a separate source export completed the same Gradle checks with an initially empty Gradle cache. These local checks prove reproducibility of this developer-preview commit, not production safety or live recommendation quality; the subsequent remote Actions result is recorded below. The previously shared temporary StepFun key was reported revoked by its owner; no test in this preflight used it.
@@ -228,8 +256,16 @@ cd D:\test\JIAOYU\apps\jianyu-android
 
 ```powershell
 cd D:\test\JIAOYU
-node --test "tests/*.test.js"
+node --test "tests/**/*.test.js"
 node scripts/check.mjs
+```
+
+The recursive glob covers the NAS web tests; `tests/nas-web/*.test.js` alone runs just those. The container smoke check needs Docker and the repository root as build context:
+
+```powershell
+docker build --file apps/jianyu-web-nas/Dockerfile --tag jianyu-nas-web:local .
+docker run --detach --name jianyu-nas-smoke --publish 8080:8080 --volume jianyu-smoke:/data jianyu-nas-web:local
+curl http://127.0.0.1:8080/healthz
 ```
 
 ## Next implementation sequence
@@ -242,6 +278,7 @@ The shared Timeline now separates identifiable choices, inputs, and any interpre
 4. Add cryptographically enforced teenager-owned/private scopes, identity-bound Graduation authorization, selective transfer, subject-separated key destruction and acknowledged remote ciphertext garbage collection.
 5. Add World Brief publisher trust/signature and revocation rules, richer accessibility/licensing/content-safety metadata, and adversarial content fixtures before calling the ecosystem production-ready.
 6. Continue emulator and physical-device acceptance at default and large font scales, light/dark themes, and with a family-owned test API key; capture accessibility and layout findings.
+7. For the NAS web app: replace PBKDF2 with a memory-hard KDF behind its own ADR, test vectors, and review; then, only after that, run the SECURITY.md §10 gates against it. Production multi-device sync stays out of reach until items 1–4 land, because the web app deliberately reuses the same single-active-writer boundary.
 
 No item moves to “Implemented” from documentation or compilation alone; the relevant behavioral or conformance evidence must exist.
 

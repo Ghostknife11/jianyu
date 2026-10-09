@@ -10,12 +10,15 @@ import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
+// 合成占位值：只用于断言请求头形状，不对应任何真实服务凭据；仓库中不得放入真实密钥。
+private const val SYNTHETIC_AUTHORIZATION_VALUE = "synthetic-authorization-value"
+
 class AiProviderCapabilityProbeTest {
     private val settings = AiProviderSettings(
         providerName = "合成服务",
         baseUrl = "https://example.test/v1",
         model = "synthetic-model",
-        apiKey = "synthetic-secret",
+        apiKey = SYNTHETIC_AUTHORIZATION_VALUE,
     )
 
     @Test
@@ -28,7 +31,7 @@ class AiProviderCapabilityProbeTest {
             assertTrue(prompt.contains("公开合成样例"))
             assertTrue(prompt.contains("纸飞机"))
             assertTrue(prompt.contains("\"ageBand\":\"7-9\""))
-            assertFalse(prompt.contains("synthetic-secret"))
+            assertFalse(prompt.contains(SYNTHETIC_AUTHORIZATION_VALUE))
             assertEquals(0.2, temperature, 0.0)
             VALID_CONTENT
         }.check(settings, PublicAiProbeCapability.issueForExplicitCheck())
@@ -167,7 +170,7 @@ class AiProviderCapabilityProbeTest {
         assertEquals("https://example.test/v1/chat/completions", connection.url.toString())
         assertEquals("POST", connection.requestMethod)
         assertFalse(connection.instanceFollowRedirects)
-        assertEquals("Bearer synthetic-secret", connection.getRequestProperty("Authorization"))
+        assertEquals("Bearer $SYNTHETIC_AUTHORIZATION_VALUE", connection.getRequestProperty("Authorization"))
         assertTrue(connection.sent.toString("UTF-8").contains("public synthetic case"))
         assertFalse(connection.sent.toString("UTF-8").contains("family-vault"))
     }

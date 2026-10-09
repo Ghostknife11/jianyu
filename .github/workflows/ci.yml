@@ -43,7 +43,82 @@ jobs:
       - name: Check JavaScript syntax
         run: node scripts/check.mjs
       - name: Test public contracts
-        run: node --test tests/*.test.js
+        run: node --test "tests/**/*.test.js"
+
+  nas-web-reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Test the NAS web server and proxy rules
+        run: node --test "tests/nas-web/*.test.js"
+      - name: Build the self-hosted image
+        run: |
+          # Pull the pinned base digest on its own before building. Registries
+          # answer shared build-farm addresses with rate limits and transient 5xx,
+          # and neither says anything about this image, so a registry hiccup should
+          # not read as a broken build. Pulling first also means a genuine Dockerfile
+          # defect still fails on the first attempt, with nothing left to download.
+          base="$(awk '/^FROM /{print $2}' apps/jianyu-web-nas/Dockerfile)"
+          attempt=1
+          until docker pull "$base"; do
+            if [ "$attempt" -ge 6 ]; then
+              echo "could not pull $base after $attempt attempts" >&2
+              exit 1
+            fi
+            delay=$((attempt * 15))
+            echo "pull attempt $attempt failed; retrying in ${delay}s" >&2
+            sleep "$delay"
+            attempt=$((attempt + 1))
+          done
+          docker build --file apps/jianyu-web-nas/Dockerfile --tag jianyu-nas-web:ci .
+      - name: Check the unprivileged account can write to a fresh data volume
+        run: |
+          # The image runs as the non-root node account, and Docker seeds a fresh named
+          # volume from the image's own /data. Writing through the real image catches a
+          # root-owned data directory here, with the reason attached, rather than sixty
+          # seconds later in the health check.
+          docker volume create jianyu-nas-probe
+          if ! docker run --rm --volume jianyu-nas-probe:/data jianyu-nas-web:ci \
+            node -e 'require("fs").mkdirSync("/data/households", { recursive: true })'; then
+            echo "the unprivileged account cannot create its directories in /data" >&2
+            exit 1
+          fi
+          docker volume rm jianyu-nas-probe
+      - name: Start the container on a scratch volume
+        run: |
+          docker volume create jianyu-nas-data
+          docker run --detach --name jianyu-nas-ci --publish 8080:8080 --volume jianyu-nas-data:/data jianyu-nas-web:ci
+      - name: Wait for the container health check
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/healthz | grep -q '"status":"ok"'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "the container never reported healthy" >&2
+          docker logs jianyu-nas-ci || true
+          exit 1
+      - name: Check the served client and its security headers
+        run: |
+          curl --fail --silent --show-error --head http://127.0.0.1:8080/ | grep -qi '^content-security-policy:'
+          curl --fail --silent --show-error http://127.0.0.1:8080/packages/provider-sdk/src/index.js | grep -q 'assertOpaqueSyncObjectId'
+          curl --fail --silent --show-error --head http://127.0.0.1:8080/packages/provider-sdk/src/index.js | grep -qi '^x-content-type-options: nosniff'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/../SECURITY.md)" != "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/households/me)" = "401"
+      - name: Verify the data volume holds no family plaintext
+        run: |
+          unexpected="$(docker exec jianyu-nas-ci sh -c 'ls -A /data | grep -v -e ^households$ -e ^sessions$ -e ^objects$' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "unexpected entries in /data: $unexpected" >&2
+            exit 1
+          fi
 
   android-reference:
     runs-on: ubuntu-24.04

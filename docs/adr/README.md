@@ -6,6 +6,10 @@ Name records `NNNN-short-title.md`. Each record should contain: status, context,
 
 The first expected ADRs cover runtime/client framework, local database, event serialization, cryptographic suite and key hierarchy, sync bundle/checkpoint protocol, and extension isolation.
 
+- [0001 Reference App foundation](0001-reference-app-foundation.md)
+- [0002 Jianyu reference client is a native Android app](0002-native-android-reference-app.md)
+- [0003 BYOK AI is the primary discovery path](0003-byok-ai-discovery-boundary.md)
+- [0004 Portable encrypted bundle v1](0004-portable-encrypted-bundle-v1.md)
 - [0005 Sync frame, merge, and tombstone semantics v1](0005-sync-frame-merge-and-tombstones-v1.md)
 - [0006 Client-encrypted sync envelope v1](0006-client-encrypted-sync-envelope-v1.md)
 - [0007 Self-controlled Graduation archive v1](0007-self-controlled-graduation-archive-v1.md)
@@ -29,3 +33,6 @@ The first expected ADRs cover runtime/client framework, local database, event se
 - [0025 Balance goals in the reference diversity selector](0025-goal-balance-in-reference-selector.md)
 - [0026 Delete a saved choice with linked event tombstones](0026-choice-deletion-and-linked-event-tombstones.md)
 - [0027 Zero-time opportunity Gate](0027-zero-time-opportunity-gate.md)
+- [0028 Self-hosted web runtime for family NAS](0028-self-hosted-web-runtime-for-family-nas.md)
+- [0029 NAS server is a ciphertext-only store with a labeled transient proxy](0029-nas-ciphertext-only-store-and-transient-proxy.md)
+- [0030 Web family-state format v1, recovery bundle, and compatibility stance](0030-web-family-state-and-recovery-bundle-v1.md)

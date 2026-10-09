@@ -173,6 +173,7 @@ Family Opportunity Engine
 
 ```text
 apps/jianyu-android/          见隅原生 Android App
+apps/jianyu-web-nas/          家庭 NAS 上的自托管 Docker 网页版
 apps/jianyu-web-prototype/    交互与领域逻辑参考，不是主交付物
 packages/foe-core/            稳定领域内核
 packages/foe-opportunity/     Discovery / Gate / Diversity
@@ -186,6 +187,12 @@ docs/adr/                     架构决策记录
 examples/                     合成数据示例
 tests/                        契约、隐私、安全与迁移测试
 ```
+
+## 家庭 NAS 上的自托管网页版
+
+`apps/jianyu-web-nas` 把同一套引擎搬进浏览器，跑在家庭自己那台 NAS 的一个 Docker 容器里。解密、Context Firewall、Gate 和多样性选择都在浏览器里用 `packages/*` 完成，NAS 只存密文。因为浏览器直连 OpenAI 兼容服务大多会被 CORS 挡掉，这里提供一个明确标注的瞬时代理：它只在一次调用的时间里经手 API 密钥和已经最小化的任务上下文，不写盘、不记日志。服务器能看到的只有密文及其大小、对象数量、请求时间、IP、会话 Cookie，以及代理调用期间内存里的密钥与任务上下文。
+
+它目前是**开发预览**：没有独立安全审计，不是生产级多设备同步（单活跃写入者加冲突重载合并，不是自动同步），用的是 PBKDF2 而不是抗内存破解的 KDF。它只声称引擎层面 Opportunity-compatible，**不声称**与 Android 版 Import-、Round-trip- 或 Sync-compatible；两边的恢复包是不同格式，谁也打不开谁。部署步骤、各品牌 NAS、反向代理 TLS、备份和完整的不声称清单见 [apps/jianyu-web-nas/README.md](apps/jianyu-web-nas/README.md)。
 
 ## 当前状态
 

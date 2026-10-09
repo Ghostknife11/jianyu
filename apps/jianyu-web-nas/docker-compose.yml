@@ -1,0 +1,31 @@
+# 见隅 NAS 网页版 —— 单容器部署示例
+#
+# 默认只监听 HTTP，适合家庭内网。要从外网访问，请在 NAS 的反向代理上终止
+# TLS（群晖 Container Manager / QNAP Container Station / Nginx Proxy Manager /
+# Traefik / Caddy 均可），由代理提供 HTTPS 证书，再把请求转发到 8080 端口。
+# 未启用 HTTPS 之前，会话 Cookie 的 Secure 属性可以通过 JIANYU_INSECURE_HTTP=1
+# 临时关闭，但这只应出现在本机测试里。
+
+services:
+  jianyu:
+    build:
+      context: ../..
+      dockerfile: apps/jianyu-web-nas/Dockerfile
+    image: jianyu-nas-web:local
+    container_name: jianyu-nas
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - jianyu-data:/data
+    environment:
+      JIANYU_DATA_DIR: /data
+      JIANYU_HOST: 0.0.0.0
+      JIANYU_PORT: "8080"
+      # 只有当你自己在家庭内网运行公开资讯服务时才需要打开：
+      # JIANYU_ALLOW_PRIVATE_FEED: "1"
+      # 仅限本机调试：允许明文 HTTP 下发送会话 Cookie。
+      # JIANYU_INSECURE_HTTP: "1"
+
+volumes:
+  jianyu-data:

@@ -1,0 +1,459 @@
+/*
+ * 见隅 NAS 网页版样式令牌。
+ *
+ * 语义色调沿用 docs/UI-SYSTEM.md：中性承载资料与表单，绿色标记发现与当前阶段，
+ * 暖色承载家庭决定与署名，冷灰表示开发预览，红色只用于删除与高风险动作。
+ * 基线宽度 360dp，正文支持 1.3 字号与深浅两套主题。
+ *
+ * 尺寸一律用 rem，这样浏览器自身的字号设置会同样放大留白与触控目标，相当于
+ * UI-SYSTEM.md 里 1.3 字号那一项验收；只有 1px 的描边保持 px，因为它是细线，
+ * 放大成发丝线反而看不见。
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --surface: #fbf9f4;
+  --surface-container: #f2efe7;
+  --surface-container-high: #eae6dc;
+  --on-surface: #1e1c18;
+  --on-surface-variant: #5b574e;
+  --outline: #cdc7ba;
+
+  --discovery: #2f6b46;
+  --discovery-container: #d5ead9;
+  --on-discovery-container: #123324;
+
+  --human-decision: #8a5a12;
+  --human-decision-container: #f6e4c4;
+  --on-human-decision-container: #4a2f06;
+
+  --preview: #4a5b6b;
+  --preview-container: #dde5ec;
+  --on-preview-container: #1f2c37;
+
+  --danger: #a03028;
+  --danger-container: #f6d9d6;
+  --on-danger-container: #521710;
+
+  --gutter: 1.25rem;
+  --section-gap: 1.125rem;
+  --card-gap: 1rem;
+  --card-padding: 1rem;
+  --card-radius: 1.125rem;
+  --touch-target: 3rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #14130f;
+    --surface-container: #201e19;
+    --surface-container-high: #2b2924;
+    --on-surface: #eae5da;
+    --on-surface-variant: #b3ac9e;
+    --outline: #45423a;
+
+    --discovery: #9fd3ae;
+    --discovery-container: #27402f;
+    --on-discovery-container: #cdebd6;
+
+    --human-decision: #e8c48a;
+    --human-decision-container: #46351a;
+    --on-human-decision-container: #f6e4c4;
+
+    --preview: #b3c4d3;
+    --preview-container: #2c3945;
+    --on-preview-container: #dde5ec;
+
+    --danger: #f0b3ac;
+    --danger-container: #4d201c;
+    --on-danger-container: #f6d9d6;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem var(--gutter);
+  border-bottom: 1px solid var(--outline);
+  background: var(--surface-container);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5625rem;
+  background: var(--discovery-container);
+  color: var(--on-discovery-container);
+  font-weight: 600;
+}
+
+.brand-name {
+  font-weight: 600;
+}
+
+.brand-status {
+  margin-left: auto;
+  color: var(--on-surface-variant);
+  font-size: 0.8125rem;
+}
+
+.page {
+  flex: 1;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: var(--section-gap) var(--gutter) 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.375rem;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.page-description {
+  margin: 0.5rem 0 0;
+  color: var(--on-surface-variant);
+}
+
+.card {
+  padding: var(--card-padding);
+  border-radius: var(--card-radius);
+  background: var(--surface-container);
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.card--neutral {
+  background: var(--surface-container);
+}
+
+.card--discovery {
+  background: var(--discovery-container);
+  color: var(--on-discovery-container);
+}
+
+.card--human-decision {
+  background: var(--human-decision-container);
+  color: var(--on-human-decision-container);
+}
+
+.card--preview {
+  background: var(--preview-container);
+  color: var(--on-preview-container);
+}
+
+.card--danger {
+  background: var(--danger-container);
+  color: var(--on-danger-container);
+}
+
+button {
+  min-height: var(--touch-target);
+  padding: 0 1.125rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--on-discovery-container);
+  background: var(--discovery-container);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.button--text {
+  background: none;
+  color: var(--on-surface);
+  font-weight: 500;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--outline);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--on-surface);
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 0.1875rem solid var(--discovery);
+  outline-offset: 0.125rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.brand-status--warning {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.card-text {
+  margin: 0;
+  color: inherit;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.field-label {
+  font-size: 0.875rem;
+  color: var(--on-surface-variant);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.list-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.list-title {
+  font-weight: 600;
+}
+
+.list-meta {
+  font-size: 0.875rem;
+  color: var(--on-surface-variant);
+}
+
+/* Nested explanation inside a card: same tones, no one-off tinted block. */
+.inset {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--surface-container-high);
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.disclosure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+.disclosure-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+  width: 100%;
+}
+
+/* Buttons that belong to one decision sit on one wrapping row, so large text
+   wraps whole labels instead of compressing them. */
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.switcher-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.switcher-who {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.picker-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  align-items: flex-start;
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  font-weight: 500;
+}
+
+.picker-item--active {
+  background: var(--discovery-container);
+  color: var(--on-discovery-container);
+  font-weight: 600;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  background: var(--surface-container-high);
+  color: var(--on-surface-variant);
+  font-size: 0.8125rem;
+}
+
+.pill--discovery {
+  background: var(--discovery-container);
+  color: var(--on-discovery-container);
+}
+
+.pill--human-decision {
+  background: var(--human-decision-container);
+  color: var(--on-human-decision-container);
+}
+
+.pill--preview {
+  background: var(--preview-container);
+  color: var(--on-preview-container);
+}
+
+.pill--danger {
+  background: var(--danger-container);
+  color: var(--on-danger-container);
+}
+
+.door-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.door {
+  gap: 0.625rem;
+}
+
+.door-title {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.card-text--quiet {
+  font-size: 0.875rem;
+  color: var(--on-surface-variant);
+}
+
+.card--discovery .card-text--quiet,
+.card--human-decision .card-text--quiet,
+.card--preview .card-text--quiet,
+.card--danger .card-text--quiet {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.nav {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.375rem var(--gutter) calc(0.375rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--outline);
+  background: var(--surface-container);
+}
+
+.nav-item {
+  flex: 1;
+  min-height: var(--touch-target);
+  border-radius: 0.75rem;
+  background: none;
+  color: var(--on-surface-variant);
+  font-weight: 500;
+}
+
+.nav-item--active {
+  background: var(--discovery-container);
+  color: var(--on-discovery-container);
+  font-weight: 600;
+}
+
+/* Windows 高对比度一类的强制颜色模式会抹掉背景色，只靠底色区分的按钮会变成一片
+   空白，所以这里把边框交还给系统颜色。 */
+@media (forced-colors: active) {
+  button,
+  .pill,
+  .nav-item,
+  .picker-item {
+    border: 1px solid ButtonBorder;
+  }
+
+  .card,
+  .inset,
+  .app-bar,
+  .nav {
+    border: 1px solid CanvasText;
+  }
+
+  :focus-visible {
+    outline: 0.1875rem solid CanvasText;
+  }
+}
