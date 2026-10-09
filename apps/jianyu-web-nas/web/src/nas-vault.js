@@ -3,11 +3,11 @@
 // reloading the current ciphertext and merging it, never by overwriting.
 //
 // Two identifiers are deliberately separate:
-//   - the server's household ID is an opaque 24-character handle the server
-//     uses as a directory name;
-//   - the household identity inside the encrypted state is a UUID that never
-//     leaves the browser.
-// Associated data binds ciphertext to the server handle and the state version.
+//   - the household identity is a UUID generated in the browser that never
+//     leaves it, and is what the associated data binds ciphertext to, so a
+//     bundle stays openable on any server;
+//   - the server handle is an opaque 24-character string the server uses as a
+//     directory name; it is a routing label, not an identity.
 
 import { mergeFamilyState } from "../../../../packages/foe-vault/src/index.js";
 import {
@@ -125,6 +125,11 @@ function assertRecord(record) {
   }
   if (typeof record.householdId !== "string" || record.householdId === "") throw new VaultError("本设备的保险箱记录不完整");
   if (typeof record.salt !== "string" || !Number.isInteger(record.iterations)) throw new VaultError("本设备的保险箱参数缺失");
+  // A vault imported from a recovery bundle has no server handle yet; it can be
+  // unlocked and edited locally but cannot reach a NAS until it is registered.
+  if (record.serverHandle !== null && typeof record.serverHandle !== "string") {
+    throw new VaultError("本设备的保险箱记录不完整");
+  }
   return record;
 }
 
@@ -155,6 +160,19 @@ export class NasFamilyVault {
     return this.#record.householdId;
   }
 
+  /** The server's opaque handle, or null for a vault that is not registered. */
+  get serverHandle() {
+    return this.#record.serverHandle ?? null;
+  }
+
+  get isRegistered() {
+    return typeof this.#record.serverHandle === "string" && this.#record.serverHandle !== "";
+  }
+
+  get salt() {
+    return this.#record.salt;
+  }
+
   get deviceId() {
     return this.#deviceId;
   }
@@ -178,16 +196,17 @@ export class NasFamilyVault {
     const salt = newSalt();
     const keys = await deriveHouseholdKeys(passphrase, salt, KDF_ITERATIONS);
     const state = createInitialFamilyState({ familyName, caregiverName, childName, birthDate });
-    const householdId = randomObjectId();
+    const householdId = state.household.id;
+    const serverHandle = randomObjectId();
     const deviceId = globalThis.crypto.randomUUID();
     await api.registerHousehold({
-      householdId,
+      householdId: serverHandle,
       verifier: bytesToHex(keys.verifier),
       salt,
       iterations: KDF_ITERATIONS
     });
     // Registration alone grants no session; the writes that follow need one.
-    await api.unlock({ householdId, verifier: bytesToHex(keys.verifier) });
+    await api.unlock({ householdId: serverHandle, verifier: bytesToHex(keys.verifier) });
     const vault = new NasFamilyVault({
       api,
       store,
@@ -197,6 +216,7 @@ export class NasFamilyVault {
         cipher: STATE_CIPHER,
         kdf: KDF_NAME,
         householdId,
+        serverHandle,
         deviceId,
         salt,
         iterations: KDF_ITERATIONS,
@@ -235,8 +255,14 @@ export class NasFamilyVault {
   }
 
   async #openSession(record) {
+    if (!this.isRegistered) {
+      // An imported bundle is a local vault until it is registered on purpose.
+      this.#serverVersion = record.stateVersion;
+      this.#record.objectId = null;
+      return;
+    }
     try {
-      await this.#api.unlock({ householdId: record.householdId, verifier: bytesToHex(this.#keys.verifier) });
+      await this.#api.unlock({ householdId: record.serverHandle, verifier: bytesToHex(this.#keys.verifier) });
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 401) {
         throw new VaultError("口令不正确，或这个家庭不在这台服务器上");
@@ -259,12 +285,29 @@ export class NasFamilyVault {
       if (!(error instanceof ApiRequestError) || !error.isStateConflict) throw error;
       throw new StateConflictError(error.details);
     }
-    this.#serverVersion = baseVersion + 1;
-    this.#record.stateVersion = this.#serverVersion;
+    this.#recordVersion(objectId, sealed, baseVersion + 1);
+    await this.#store.write(this.#record);
+  }
+
+  /** Records a freshly sealed object as the current version. */
+  #recordVersion(objectId, sealed, version) {
+    this.#serverVersion = version;
+    this.#record.stateVersion = version;
     this.#record.objectId = objectId;
     this.#record.nonce = sealed.nonce;
     this.#record.ciphertext = sealed.ciphertext;
     this.#record.updatedAt = new Date().toISOString();
+  }
+
+  /**
+   * Seals into the local record without touching a server, so a vault that is
+   * not registered anywhere can still be locked and reopened on this device.
+   */
+  async #sealLocally() {
+    assertFamilyState(this.#state);
+    const objectId = randomObjectId();
+    const sealed = await sealState(this.#keys.vaultKey, this.#state, this.#record.householdId, this.#serverVersion + 1);
+    this.#recordVersion(objectId, sealed, this.#serverVersion + 1);
     await this.#store.write(this.#record);
   }
 
@@ -303,9 +346,66 @@ export class NasFamilyVault {
     await this.#commitNewState();
   }
 
+  /**
+   * Replaces the local vault with a verified recovery bundle. The passphrase
+   * given here becomes this device's own credential; nothing is sent anywhere.
+   */
+  static async importRecoveryBundle({ preview, passphrase }, { api, store }) {
+    if (!preview?.state) throw new VaultError("没有待导入的恢复包");
+    assertPassphrase(passphrase);
+    const salt = preview.salt;
+    if (typeof salt !== "string") throw new VaultError("恢复包缺少盐值");
+    const keys = await deriveHouseholdKeys(passphrase, salt, preview.iterations ?? KDF_ITERATIONS);
+    const record = {
+      format: STATE_FORMAT,
+      cipher: STATE_CIPHER,
+      kdf: KDF_NAME,
+      householdId: preview.householdId,
+      serverHandle: null,
+      deviceId: globalThis.crypto.randomUUID(),
+      salt,
+      iterations: preview.iterations ?? KDF_ITERATIONS,
+      stateVersion: preview.stateVersion,
+      objectId: null
+    };
+    const vault = new NasFamilyVault({
+      api,
+      store,
+      keys,
+      record,
+      state: preview.state,
+      serverVersion: preview.stateVersion
+    });
+    await vault.#sealLocally();
+    return vault;
+  }
+
+  /**
+   * Registers an imported vault on this NAS. This is a separate, explicit
+   * action: the bundle itself never touches a server.
+   */
+  async registerOnServer() {
+    if (!this.isUnlocked) throw new VaultError("家庭保险箱尚未解锁");
+    if (this.isRegistered) throw new VaultError("这个家庭已经登记在这台服务器上");
+    const serverHandle = randomObjectId();
+    await this.#api.registerHousehold({
+      householdId: serverHandle,
+      verifier: bytesToHex(this.#keys.verifier),
+      salt: this.#record.salt,
+      iterations: this.#record.iterations
+    });
+    await this.#api.unlock({ householdId: serverHandle, verifier: bytesToHex(this.#keys.verifier) });
+    this.#record.serverHandle = serverHandle;
+    this.#serverVersion = 0;
+    this.#record.objectId = null;
+    await this.#commitNewState();
+    return serverHandle;
+  }
+
   /** Persists the in-memory state. Throws StateConflictError when stale. */
   async save() {
     if (!this.isUnlocked) throw new VaultError("家庭保险箱尚未解锁");
+    if (!this.isRegistered) throw new VaultError("这个家庭还没有登记在这台服务器上，请先在设置里登记");
     await this.#commitNewState();
     return this.#serverVersion;
   }

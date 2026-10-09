@@ -26,11 +26,30 @@ class FakeNode {
   }
 
   append(...nodes) {
-    for (const node of nodes) this.childNodes.push(node);
+    for (const node of nodes) {
+      node.parentNode = this;
+      this.childNodes.push(node);
+    }
   }
 
   replaceChildren(...nodes) {
+    for (const node of this.childNodes) node.parentNode = null;
+    for (const node of nodes) node.parentNode = this;
     this.childNodes = [...nodes];
+  }
+
+  // The download link is clicked and then detached, so the stub has to behave
+  // like an element rather than throw on either call.
+  click() {
+    return this.dispatch("click");
+  }
+
+  remove() {
+    if (!this.parentNode) return;
+    const siblings = this.parentNode.childNodes;
+    const index = siblings.indexOf(this);
+    if (index >= 0) siblings.splice(index, 1);
+    this.parentNode = null;
   }
 
   addEventListener(type, handler) {
@@ -178,10 +197,13 @@ const CAPABILITIES = {
 
 const elements = new Map();
 const requests = [];
+const downloads = [];
 
 function installBrowserStubs() {
   elements.set("main", new FakeNode("main"));
   elements.set("brand-status", new FakeNode("span"));
+  const body = new FakeNode("body");
+  elements.set("body", body);
   globalThis.Node = FakeNode;
   globalThis.document = {
     createElement: (tag) => new FakeNode(tag),
@@ -190,7 +212,21 @@ function installBrowserStubs() {
       node.textContent = text;
       return node;
     },
-    getElementById: (id) => elements.get(id) ?? null
+    getElementById: (id) => elements.get(id) ?? null,
+    body
+  };
+  globalThis.Blob = class {
+    constructor(parts) {
+      this.parts = parts;
+      this.text = async () => parts.join("");
+    }
+  };
+  globalThis.URL = {
+    createObjectURL: (blob) => {
+      downloads.push(blob);
+      return "blob:jianyu-recovery-bundle";
+    },
+    revokeObjectURL: () => {}
   };
   globalThis.indexedDB = createIndexedDbStub();
   globalThis.fetch = async (url, options = {}) => {
@@ -264,6 +300,8 @@ describe("NAS web bootstrap", () => {
     delete globalThis.document;
     delete globalThis.indexedDB;
     delete globalThis.fetch;
+    delete globalThis.Blob;
+    delete globalThis.URL;
   });
 
   it("renders the create screen for a browser with no local record", () => {
@@ -300,6 +338,67 @@ describe("NAS web bootstrap", () => {
       assert.ok(!sent.includes(secret), `the registration body must not contain ${secret}`);
     }
     assert.ok(requests.some((request) => request.path === "/api/state" && request.method === "PUT"));
+  });
+
+  it("exports a recovery bundle whose file and code are never sent as plaintext", async () => {
+    buttonByLabel("设置").dispatch("click");
+    await settle("恢复包");
+    buttonByLabel("导出恢复包").dispatch("click");
+    await settle("恢复码（只显示这一次）");
+
+    assert.equal(downloads.length, 1, "exporting must offer exactly one file");
+    const text = await downloads[0].text();
+    for (const secret of [PASSPHRASE, FAMILY_NAME, CAREGIVER_NAME, CHILD_NAME]) {
+      assert.ok(!text.includes(secret), `the bundle must not contain ${secret}`);
+    }
+    assert.match(text, /org\.jianyu\.web-recovery-bundle\/v1/);
+
+    // The code is shown once and is not persisted anywhere in the DOM.
+    const shown = main().text().match(/[2-9A-HJ-NP-Z]{5}(?:-[2-9A-HJ-NP-Z]{5}){3}/u);
+    assert.ok(shown, "the recovery code must be shown once at export");
+    buttonByLabel("知道了").dispatch("click");
+    await settle("恢复包文件");
+    assert.equal(main().text().includes(shown[0]), false, "the code must not linger on screen");
+  });
+
+  it("imports a bundle as a replacement, and a local change invalidates the preview", async () => {
+    buttonByLabel("设置").dispatch("click");
+    await settle("恢复包");
+    buttonByLabel("导出恢复包").dispatch("click");
+    await settle("恢复码（只显示这一次）");
+    const code = main().text().match(/[2-9A-HJ-NP-Z]{5}(?:-[2-9A-HJ-NP-Z]{5}){3}/u)[0];
+    // The newest download, not the first one this suite ever produced.
+    const bundleText = await downloads.at(-1).text();
+    buttonByLabel("知道了").dispatch("click");
+    await settle("恢复包文件");
+
+    // Feed the exported file back through the import path.
+    inputByName("bundleFile").files = [{ text: async () => bundleText }];
+    inputByName("bundleCode").value = code;
+    buttonByLabel("验证恢复包").dispatch("click");
+    await settle("确认导入这个家庭？");
+    assert.match(main().text(), /隅之家/);
+
+    // A local change after the preview must refuse the import, not merge.
+    buttonByLabel("取消").dispatch("click");
+    await settle("恢复包文件");
+    buttonByLabel("家庭").dispatch("click");
+    await settle("添加孩子");
+    inputByName("childName").value = "三宝";
+    inputByName("birthDate").value = "2019-01-31";
+    buttonByLabel("添加孩子").dispatch("click");
+    await settle("三宝");
+    buttonByLabel("设置").dispatch("click");
+    await settle("恢复包");
+
+    inputByName("bundleFile").files = [{ text: async () => bundleText }];
+    inputByName("bundleCode").value = code;
+    buttonByLabel("验证恢复包").dispatch("click");
+    await settle("确认导入这个家庭？");
+    inputByName("bundlePassphrase").value = "synthetic-second-device";
+    buttonByLabel("确认替换").dispatch("click");
+    await settle("预览之后这台浏览器里的记录又变了");
+    assert.match(main().text(), /预览之后这台浏览器里的记录又变了/);
   });
 
   it("navigates to settings and erases only after a second confirmation", async () => {

@@ -27,6 +27,10 @@ export async function startServer(overrides) {
 
 export async function stopServer(instance) {
   await instance.app.close();
+  // The global fetch pool is keyed by origin, and a fresh ephemeral port is
+  // often handed back to the next server. Closing the connection each time
+  // keeps a dead socket from being reused against the new one.
+  await new Promise((resolve) => setTimeout(resolve, 25));
   await rm(instance.dataDir, { recursive: true, force: true });
 }
 
@@ -34,7 +38,7 @@ export async function stopServer(instance) {
 export function createCookieFetch() {
   let cookie = null;
   return async (url, options = {}) => {
-    const headers = { ...options.headers };
+    const headers = { connection: "close", ...options.headers };
     if (cookie) headers.cookie = cookie;
     const response = await fetch(url, { ...options, headers, redirect: "error" });
     for (const value of response.headers.getSetCookie?.() ?? []) {
@@ -53,7 +57,7 @@ export class Session {
   }
 
   async request(path, options = {}) {
-    const headers = { ...options.headers };
+    const headers = { connection: "close", ...options.headers };
     if (this.cookie) headers.cookie = this.cookie;
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, { ...options, headers });
     for (const value of response.headers.getSetCookie?.() ?? []) {

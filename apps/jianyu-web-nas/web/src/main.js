@@ -5,6 +5,14 @@
 import { NasApi } from "./session.js";
 import { NasFamilyVault, StateConflictError, VaultError, createIndexedDbStore } from "./nas-vault.js";
 import { childLifecycle } from "./family-state.js";
+import { digestState } from "./nas-crypto.js";
+import {
+  exportRecoveryBundle,
+  parseRecoveryBundle,
+  previewRecoveryBundle,
+  RecoveryBundleError,
+  serializeRecoveryBundle
+} from "./recovery-bundle.js";
 
 const api = new NasApi({});
 const store = createIndexedDbStore();
@@ -23,7 +31,10 @@ const state = {
   vault: null,
   message: null,
   conflict: false,
-  pendingErase: false
+  pendingErase: false,
+  // The recovery bundle in flight: shown once at export, previewed then
+  // confirmed on import. It is deliberately not a merge.
+  recovery: null
 };
 
 function el(tag, attributes = {}, children = []) {
@@ -61,6 +72,18 @@ function input(attributes) {
 
 function button(label, onClick, tone = "filled") {
   return el("button", { class: tone === "text" ? "button--text" : "", type: "button", onClick }, label);
+}
+
+/** Turns a thrown value into a sentence a family member can act on. */
+function describe(error) {
+  if (error instanceof RecoveryBundleError || error instanceof VaultError) return error.message;
+  if (error instanceof StateConflictError) return error.message;
+  return "操作没有完成，请再试一次";
+}
+
+/** A stable fingerprint of the unlocked state, used to invalidate a preview. */
+function digestOf(vault) {
+  return digestState(vault.state);
 }
 
 function messageCard() {
@@ -299,6 +322,9 @@ function renderFamily() {
 
 function renderSettings() {
   const vault = state.vault;
+  const bundleFile = input({ name: "bundleFile", type: "file", accept: "application/json,.json" });
+  const bundleCode = input({ name: "bundleCode", autocomplete: "off", placeholder: "例如 23456-23456-23456-23456" });
+  const bundlePassphrase = input({ name: "bundlePassphrase", type: "password", autocomplete: "new-password" });
 
   async function lock() {
     await vault.lock();
@@ -318,6 +344,143 @@ function renderSettings() {
     state.pendingErase = false;
     state.screen = "create";
     render();
+  }
+
+  async function registerOnServer() {
+    state.message = null;
+    try {
+      await vault.registerOnServer();
+      state.message = "已经登记到这台服务器，家庭记录会以密文保存在这里。";
+    } catch (error) {
+      state.message = describe(error);
+    }
+    render();
+  }
+
+  async function exportBundle() {
+    state.message = null;
+    try {
+      const { bundle, recoveryCode } = await exportRecoveryBundle({ vault });
+      const blob = new Blob([serializeRecoveryBundle(bundle)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = el("a", { href: url, download: "jianyu-recovery-bundle.json" });
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      // Shown once, and never stored: losing it with the passphrase loses the vault.
+      state.recovery = { mode: "exported", recoveryCode };
+    } catch (error) {
+      state.message = describe(error);
+    }
+    render();
+  }
+
+  async function verifyBundle() {
+    state.message = null;
+    const file = bundleFile.files?.[0];
+    if (!file) {
+      state.message = "请先选择恢复包文件";
+      render();
+      return;
+    }
+    try {
+      const bundle = parseRecoveryBundle(await file.text());
+      const preview = await previewRecoveryBundle(bundle, bundleCode.value);
+      state.recovery = {
+        mode: "preview",
+        preview,
+        currentName: state.vault?.state.household.name ?? null,
+        // A local change after the preview must invalidate it, never merge.
+        fingerprint: await state.vault ? digestOf(state.vault) : null
+      };
+    } catch (error) {
+      state.recovery = null;
+      state.message = describe(error);
+    }
+    render();
+  }
+
+  async function confirmBundle() {
+    const preview = state.recovery?.preview;
+    if (!preview) return;
+    state.message = null;
+    try {
+      if (state.recovery.fingerprint !== null && state.vault) {
+        if (await digestOf(state.vault) !== state.recovery.fingerprint) {
+          state.recovery = null;
+          state.message = "预览之后这台浏览器里的记录又变了，请重新验证恢复码再导入。";
+          render();
+          return;
+        }
+      }
+      state.vault = await NasFamilyVault.importRecoveryBundle(
+        { preview, passphrase: bundlePassphrase.value },
+        { api, store }
+      );
+      state.recovery = null;
+      state.screen = "app";
+      state.route = "today";
+      state.message = "已经导入恢复包。这台浏览器现在打开的是这个家庭的记录，它还没有登记到这台服务器上。";
+    } catch (error) {
+      state.message = describe(error);
+    }
+    render();
+  }
+
+  function cancelBundle() {
+    state.recovery = null;
+    state.message = null;
+    render();
+  }
+
+  /**
+   * The recovery bundle panel. Export shows the code once; import is a verified
+   * preview followed by a separate confirmation, and never a merge.
+   */
+  function recoveryCard() {
+    const recovery = state.recovery;
+    if (recovery?.mode === "exported") {
+      return card("human-decision", [
+        el("h3", { class: "card-title", text: "恢复码（只显示这一次）" }),
+        el("p", { class: "card-text", text: recovery.recoveryCode }),
+        el("p", {
+          class: "card-text",
+          text: "请把它和恢复包文件一起保存在安全的地方。恢复码和口令都丢了，这份家庭记录就无法再打开。关闭或刷新这个页面后不会再显示。"
+        }),
+        button("知道了", () => {
+          state.recovery = null;
+          render();
+        })
+      ]);
+    }
+
+    if (recovery?.mode === "preview") {
+      const preview = recovery.preview;
+      return card("human-decision", [
+        el("h3", { class: "card-title", text: "确认导入这个家庭？" }),
+        el("p", {
+          class: "card-text",
+          text: `恢复包里的家庭称呼是「${preview.householdName}」，有 ${preview.childCount} 个孩子、${preview.memberCount} 位成员，状态版本 ${preview.stateVersion}。`
+        }),
+        recovery.currentName
+          ? el("p", {
+            class: "card-text",
+            text: `这台浏览器现在打开的是「${recovery.currentName}」。确认后它会被整体替换，不是合并。`
+          })
+          : null,
+        field("为这台设备设置口令", bundlePassphrase),
+        button("确认替换", confirmBundle),
+        button("取消", cancelBundle, "text")
+      ]);
+    }
+
+    return el("div", {}, [
+      field("恢复包文件", bundleFile),
+      field("恢复码", bundleCode),
+      button("导出恢复包", exportBundle),
+      button("验证恢复包", verifyBundle, "text")
+    ]);
   }
 
   return el("div", { class: "page" }, [
@@ -345,17 +508,35 @@ function renderSettings() {
       el("p", { class: "card-text", text: "BYOK 密钥与瞬时代理将在后续版本接入；接入后每次调用前都会单独确认。" })
     ]),
     card("neutral", [
+      el("h2", { class: "card-title", text: "恢复包" }),
+      el("p", {
+        class: "card-text",
+        text: "导出一个加密恢复包和一个只显示一次的恢复码。第二台浏览器可以用它接管这份家庭记录。"
+      }),
+      el("p", {
+        class: "card-text",
+        text: "导入是整体替换，不是合并：确认后这台浏览器里原来的家庭记录会被替换掉。恢复包本身不会改动服务器上的任何内容，登记到这台 NAS 是另一步、需要你单独确认的操作。"
+      }),
+      recoveryCard()
+    ]),
+    card("neutral", [
       el("h2", { class: "card-title", text: "资料与设备" }),
       el("ul", { class: "list" }, [
         el("li", { class: "list-row" }, [
-          el("span", { class: "list-title", text: "恢复包导出" }),
-          el("span", { class: "list-meta", text: "开发预览" })
-        ]),
-        el("li", { class: "list-row" }, [
           el("span", { class: "list-title", text: "服务器上的密文对象" }),
           el("span", { class: "list-meta", text: `状态版本 ${vault.stateVersion}` })
-        ])
+        ]),
+        vault.isRegistered
+          ? el("li", { class: "list-row" }, [
+            el("span", { class: "list-title", text: "已登记在这台服务器" }),
+            el("span", { class: "list-meta", text: "保存会自动同步到这台 NAS" })
+          ])
+          : el("li", { class: "list-row" }, [
+            el("span", { class: "list-title", text: "尚未登记在这台服务器" }),
+            el("span", { class: "list-meta", text: "只能在本机解锁，保存前需要先登记" })
+          ])
       ]),
+      vault.isRegistered ? null : button("登记到这台服务器", registerOnServer),
       button("锁定保险箱", lock, "text")
     ]),
     card("danger", [

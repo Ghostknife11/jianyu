@@ -56,12 +56,14 @@ describe("nas family vault", () => {
     assert.equal(vault.isUnlocked, true);
     assert.equal(vault.state.household.name, "隅之家");
     assert.equal(vault.stateVersion, 1);
-    assert.match(vault.householdId, /^[A-Za-z0-9_-]{24}$/u, "the server handle is opaque and 24 characters");
+    assert.match(vault.serverHandle, /^[A-Za-z0-9_-]{24}$/u, "the server handle is opaque and 24 characters");
+    assert.notEqual(vault.householdId, vault.serverHandle, "identity and routing handle stay separate");
 
     assert.equal((await storedObjects(api)).length, 1, "one sealed state object exists");
 
     const record = await store.read();
     assert.equal(record.householdId, vault.householdId);
+    assert.equal(record.serverHandle, vault.serverHandle);
     assert.equal(record.stateVersion, 1);
     const serialized = JSON.stringify(record);
     for (const secret of [PASSPHRASE, "隅之家", "小隅", "妈妈", "nas-vault-v1"]) {
@@ -87,7 +89,8 @@ describe("nas family vault", () => {
     for (const secret of [PASSPHRASE, "隅之家", "小隅", "二宝", "2013-09-15", "nas-vault-v1", "nas-auth-v1"]) {
       assert.equal(everything.includes(secret), false, `the server must never receive ${secret}`);
     }
-    assert.equal(everything.includes(vault.householdId), true, "the opaque handle is the only household identifier sent");
+    assert.equal(everything.includes(vault.serverHandle), true, "the opaque handle is the only household identifier sent");
+    assert.equal(everything.includes(vault.householdId), false, "the household identity never reaches the server");
   });
 
   it("unlocks again on the same browser and round-trips the state", async () => {
@@ -218,18 +221,18 @@ describe("nas family vault", () => {
     const store = createMemoryStore();
     const api = apiFor(instance.baseUrl);
     const vault = await NasFamilyVault.create({ passphrase: PASSPHRASE, ...FAMILY }, { api, store });
-    const householdId = vault.householdId;
+    const handle = vault.serverHandle;
     await vault.eraseEverywhere();
 
     assert.equal(vault.isUnlocked, false);
     assert.equal(await store.read(), null);
     assert.equal(
-      existsSync(join(instance.dataDir, "objects", householdId)),
+      existsSync(join(instance.dataDir, "objects", handle)),
       false,
       "the household's ciphertext objects must be removed"
     );
     assert.equal(
-      existsSync(join(instance.dataDir, "households", `${householdId}.json`)),
+      existsSync(join(instance.dataDir, "households", `${handle}.json`)),
       false,
       "the household record must be removed"
     );
